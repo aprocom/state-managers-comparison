@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
-import { appStore, useAppStore } from '../state/store';
+import { NOW, appStore, useAppStore } from '../state/store';
 import { attachAlertEngine } from '../state/alertEngine';
 import { selectAccountTotals, selectInstrumentRows, selectPositionRows } from '../state/selectors';
 
@@ -11,13 +12,16 @@ export function TerminalScreen() {
   const selectedId = useAppStore((state) => state.selectedInstrumentId);
   const selectInstrument = useAppStore((state) => state.selectInstrument);
 
-  const instrumentRows = useAppStore(selectInstrumentRows);
-  const positionRows = useAppStore(selectPositionRows);
-  const totals = useAppStore(selectAccountTotals);
+  // useShallow is Zustand's own answer to "my selector returns a new array
+  // every time": the selector still runs, but the component only re-renders
+  // when the shallow contents actually differ.
+  const instrumentRows = useAppStore(useShallow(selectInstrumentRows));
+  const positionRows = useAppStore(useShallow(selectPositionRows));
+  const totals = useAppStore(useShallow(selectAccountTotals));
   const alerts = useAppStore((state) => state.alerts);
 
   useEffect(
-    () => attachAlertEngine(appStore, { now: () => Date.now(), onFire: () => {} }),
+    () => attachAlertEngine(appStore, { now: () => NOW, onFire: () => {} }),
     [],
   );
 

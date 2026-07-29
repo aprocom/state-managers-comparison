@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { INSTRUMENTS, STRATEGIES } from '@smc/domain';
 import { EquityChart, FilterBar, JournalTable, StatsPanel, TESTID } from '@smc/ui';
@@ -13,6 +14,11 @@ export function JournalScreen() {
   const stats = useAtomValue(journalStatsAtom);
   const curve = useAtomValue(equityCurveAtom);
   const editTrade = useSetAtom(editTradeAtom);
+  // Stable identity: JournalTable forwards this to a memoised JournalRow.
+  const handleEdit = useCallback(
+    (id: string, patch: { strategy?: string; note?: string }) => { editTrade(id, patch); },
+    [editTrade],
+  );
 
   return (
     <div data-testid={TESTID.screenJournal} className="journal">
@@ -27,7 +33,7 @@ export function JournalScreen() {
       <JournalTable
         rows={rows}
         strategies={STRATEGIES}
-        onEdit={(id, patch) => editTrade(id, patch)}
+        onEdit={handleEdit}
       />
     </div>
   );

@@ -61,6 +61,40 @@ class InstrumentModel {
   }
 }
 
+/**
+ * The mirror of InstrumentModel for open positions, and the fix for a bug this
+ * project shipped and published: `positionRows` used to be a single store-level
+ * computed that rebuilt all six row objects whenever any watched price changed.
+ * It read as idiomatic MobX and cost six row renders per tick instead of one.
+ * Putting the computed on the position puts the invalidation boundary where the
+ * data boundary already is.
+ */
+class PositionModel {
+  constructor(
+    readonly position: Position,
+    private readonly instrument: InstrumentModel | undefined,
+  ) {
+    makeObservable(this, { row: computed, markPrice: computed });
+  }
+
+  get markPrice(): number {
+    return this.instrument?.price ?? this.position.entryPrice;
+  }
+
+  get row(): PositionRowModel {
+    const { markPrice } = this;
+    return {
+      id: this.position.id,
+      instrumentId: this.position.instrumentId,
+      side: this.position.side,
+      size: this.position.size,
+      entryPrice: this.position.entryPrice,
+      markPrice,
+      unrealizedPnl: unrealizedPnl(this.position, markPrice),
+    };
+  }
+}
+
 export interface StoreOptions {
   seed: number;
   tradeCount: number;
@@ -84,6 +118,17 @@ export class AppStore {
   readonly instruments: InstrumentModel[] = INSTRUMENTS.map((i) => new InstrumentModel(i));
   private readonly modelsById = new Map<InstrumentId, InstrumentModel>();
 
+  private readonly positionModels: PositionModel[];
+
+  /**
+   * Frozen at construction, and deliberately so. The alert rules read the clock
+   * (time-in-trade, the tilt window), and reading a live `Date.now()` from a
+   * computed makes it impure: its cache goes stale on a schedule MobX cannot
+   * see, and the same app produces different alerts depending on the day you
+   * open it. All five implementations freeze it the same way.
+   */
+  readonly now: number;
+
   positions: Position[];
   trades: Trade[];
   selectedInstrumentId: InstrumentId | null = INSTRUMENTS[0]?.id ?? null;
@@ -92,13 +137,20 @@ export class AppStore {
   filter: JournalFilter = { strategy: null, side: null, instrumentId: null };
 
   constructor(options: StoreOptions) {
+    this.now = options.now;
     this.positions = seedPositions(options.seed, options.now);
     this.trades = createTradeHistory(options.seed, options.tradeCount, options.now);
     for (const model of this.instruments) this.modelsById.set(model.id, model);
+    this.positionModels = this.positions.map(
+      (position) => new PositionModel(position, this.modelsById.get(position.instrumentId)),
+    );
 
     makeObservable(this, {
-      positions: observable,
-      trades: observable,
+      // `.ref` because both arrays are only ever replaced wholesale. Deep
+      // observability would proxy-wrap 250 trade objects to track mutations
+      // that never happen.
+      positions: observable.ref,
+      trades: observable.ref,
       selectedInstrumentId: observable,
       feedRate: observable,
       screen: observable,
@@ -148,18 +200,7 @@ export class AppStore {
   }
 
   get positionRows(): PositionRowModel[] {
-    return this.positions.map((position) => {
-      const markPrice = this.priceOf(position.instrumentId, position.entryPrice);
-      return {
-        id: position.id,
-        instrumentId: position.instrumentId,
-        side: position.side,
-        size: position.size,
-        entryPrice: position.entryPrice,
-        markPrice,
-        unrealizedPnl: unrealizedPnl(position, markPrice),
-      };
-    });
+    return this.positionModels.map((model) => model.row);
   }
 
   get accountTotals(): { totalPnl: number; usedRisk: number; drawdown: number } {
@@ -236,12 +277,13 @@ export class AppStore {
   }
 
   /**
-   * A plain computed. MobX recomputes it only when something it actually read
+   * A plain computed, and a pure one: every input is either observable or the
+   * frozen clock. MobX recomputes it only when something it actually read
    * changes, and the `reaction` below turns that into fire-once notification
    * without any bookkeeping — no key Set, no previous-value diffing.
    */
   get alerts(): Alert[] {
-    return evaluateAlerts(this.buildAlertContext(Date.now()));
+    return evaluateAlerts(this.buildAlertContext(this.now));
   }
 }
 

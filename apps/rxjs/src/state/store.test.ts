@@ -98,7 +98,7 @@ describe('rxjs store — alerts', () => {
       store.applyQuote(quote({ price: 61000 + seq, seq }));
     }
 
-    expect(onFire.mock.calls.filter(([alert]) => alert.kind === 'risk-per-trade')).toHaveLength(0);
+    expect(onFire.mock.calls.filter(([alert]) => alert.kind === 'risk-per-trade')).toHaveLength(1);
     store.destroy();
   });
 

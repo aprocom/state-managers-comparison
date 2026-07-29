@@ -5,6 +5,12 @@ import { appStore } from '../state/store';
 
 const INSTRUMENT_IDS = INSTRUMENTS.map((instrument) => instrument.id);
 
+// Hoisted, not inline. JournalTable forwards onEdit straight to a memoised
+// JournalRow, so a fresh arrow here re-renders all 250 rows on every keystroke.
+const handleEdit = (id: string, patch: { strategy?: string; note?: string }) => {
+  appStore.editTrade(id, patch);
+};
+
 export const JournalScreen = observer(function JournalScreen() {
   return (
     <div data-testid={TESTID.screenJournal} className="journal">
@@ -19,7 +25,7 @@ export const JournalScreen = observer(function JournalScreen() {
       <JournalTable
         rows={appStore.journalRows}
         strategies={STRATEGIES}
-        onEdit={(id, patch) => appStore.editTrade(id, patch)}
+        onEdit={handleEdit}
       />
     </div>
   );

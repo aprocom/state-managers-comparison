@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Alert, InstrumentId } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
-import { appStore, instrumentSelected, quoteApplied } from '../state/slice';
+import { NOW, appStore, instrumentSelected, quoteApplied } from '../state/slice';
 import type { AppDispatch, RootState } from '../state/slice';
 import {
   selectAccountTotals, selectInstrumentRows, selectPositionRows,
@@ -29,7 +29,7 @@ export function TerminalScreen() {
 
   useEffect(
     () => attachAlertEngine(appStore, {
-      now: () => Date.now(),
+      now: () => NOW,
       onFire: () => {},
       onChange: setAlerts,
     }),

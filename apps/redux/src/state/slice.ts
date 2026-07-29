@@ -1,5 +1,7 @@
-import { configureStore, createSlice } from '@reduxjs/toolkit';
-import type { PayloadAction } from '@reduxjs/toolkit';
+import {
+  configureStore, createEntityAdapter, createListenerMiddleware, createSlice,
+} from '@reduxjs/toolkit';
+import type { EntityState, PayloadAction } from '@reduxjs/toolkit';
 import { INSTRUMENTS, START_PRICES, createTradeHistory, mulberry32 } from '@smc/domain';
 import type { InstrumentId, Position, Quote, Trade } from '@smc/domain';
 import type { JournalFilter } from '@smc/ui';
@@ -9,14 +11,31 @@ export type Screen = 'terminal' | 'journal';
 
 export const SEED = 20260729;
 export const TRADE_COUNT = 250;
+
+/**
+ * Frozen at construction. The alert rules read the clock, and evaluating them
+ * against a live Date.now() while seeding positions from a fixed date made the
+ * alert set drift with the calendar. All five implementations freeze it alike.
+ */
 export const NOW = Date.UTC(2026, 6, 29);
+
+/**
+ * Normalised, because this is what Redux is actually for. Editing a trade used
+ * to be a linear scan over 250 array elements; `updateOne` is a keyed write.
+ * The `sortComparer` also moves the journal's newest-first ordering into the
+ * store, so no selector has to re-sort on every read.
+ */
+export const tradesAdapter = createEntityAdapter<Trade>({
+  sortComparer: (a, b) => b.closedAt - a.closedAt,
+});
+export const positionsAdapter = createEntityAdapter<Position>();
 
 export interface AppState {
   prices: Record<InstrumentId, number>;
   priceDirections: Record<InstrumentId, PriceDirection>;
   sequences: Record<InstrumentId, number>;
-  positions: Position[];
-  trades: Trade[];
+  positions: EntityState<Position, string>;
+  trades: EntityState<Trade, string>;
   selectedInstrumentId: InstrumentId | null;
   feedRate: number;
   screen: Screen;
@@ -43,8 +62,12 @@ export function createInitialState(
     prices: { ...START_PRICES },
     priceDirections: {},
     sequences: {},
-    positions: seedPositions(seed, now),
-    trades: createTradeHistory(seed, tradeCount, now),
+    positions: positionsAdapter.setAll(
+      positionsAdapter.getInitialState(), seedPositions(seed, now),
+    ),
+    trades: tradesAdapter.setAll(
+      tradesAdapter.getInitialState(), createTradeHistory(seed, tradeCount, now),
+    ),
     selectedInstrumentId: INSTRUMENTS[0]?.id ?? null,
     feedRate: 10,
     screen: 'terminal',
@@ -54,7 +77,7 @@ export function createInitialState(
 
 /**
  * Immer lets the reducer read like a mutation while still producing a new
- * state object. Note what that costs here: a quote at 100/s runs the whole
+ * state object. Note what that costs here: a quote at 1000/s runs the whole
  * draft-and-finalise cycle, and every derived value has to be rebuilt by a
  * reselect selector because the store itself derives nothing.
  */
@@ -66,10 +89,10 @@ const appSlice = createSlice({
       const quote = action.payload;
       if (quote.seq <= (state.sequences[quote.instrumentId] ?? 0)) return;
       const previous = state.prices[quote.instrumentId];
-      state.priceDirections[quote.instrumentId] =
-        previous === undefined || previous === quote.price
-          ? 'flat'
-          : quote.price > previous ? 'up' : 'down';
+      state.priceDirections[quote.instrumentId] = previous === undefined
+        || previous === quote.price
+        ? 'flat'
+        : quote.price > previous ? 'up' : 'down';
       state.prices[quote.instrumentId] = quote.price;
       state.sequences[quote.instrumentId] = quote.seq;
     },
@@ -89,9 +112,10 @@ const appSlice = createSlice({
       state,
       action: PayloadAction<{ id: string; patch: { strategy?: string; note?: string } }>,
     ) {
-      const trade = state.trades.find((candidate) => candidate.id === action.payload.id);
-      if (trade === undefined) return;
-      Object.assign(trade, action.payload.patch);
+      tradesAdapter.updateOne(state.trades, {
+        id: action.payload.id,
+        changes: action.payload.patch,
+      });
     },
   },
 });
@@ -101,20 +125,26 @@ export const {
 } = appSlice.actions;
 
 export function createAppStore(preloadedState?: AppState) {
-  return configureStore({
+  // One listener-middleware instance per store, as the RTK docs require — a
+  // module-level instance would leak listeners between stores in tests.
+  const listeners = createListenerMiddleware();
+  const store = configureStore({
     reducer: { app: appSlice.reducer },
     ...(preloadedState === undefined ? {} : { preloadedState: { app: preloadedState } }),
+    // The dev-only checks re-scan the whole state on every dispatch. RTK already
+    // strips them from production builds, so switching them off only changes
+    // `npm run dev` — it is here because a 1000/s feed makes the dev experience
+    // unusable, not because it flatters the benchmark.
     middleware: (getDefault) => getDefault({
-      // 250 trades and 50 prices are re-scanned by these checks on every
-      // dispatch. At 100 quotes per second that dominates the profile, so they
-      // are off here exactly as they would be in a real high-frequency app.
       serializableCheck: false,
       immutableCheck: false,
-    }),
+    }).prepend(listeners.middleware),
   });
+  return Object.assign(store, { listeners });
 }
 
 export const appStore = createAppStore();
 
 export type RootState = ReturnType<typeof appStore.getState>;
 export type AppDispatch = typeof appStore.dispatch;
+export type AppStore = ReturnType<typeof createAppStore>;

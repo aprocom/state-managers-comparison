@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 import {
   INSTRUMENTS, START_PRICES, createTradeHistory, mulberry32,
 } from '@smc/domain';
@@ -50,8 +51,18 @@ function seedPositions(seed: number, now: number): Position[] {
   }));
 }
 
+/**
+ * Frozen at construction. The alert rules read the clock, and evaluating them
+ * against a live Date.now() while seeding positions from a fixed date made the
+ * alert set drift with the calendar. All five implementations freeze it alike.
+ */
+export const NOW = Date.UTC(2026, 6, 29);
+
 export function createAppStore(options: StoreOptions) {
-  return create<AppState>((set, get) => ({
+  // subscribeWithSelector lets the alert engine watch only the slices it reads
+  // instead of every store write. It ships with Zustand; hand-rolling the same
+  // thing and then billing Zustand for the lines would be measuring me.
+  return create<AppState>()(subscribeWithSelector((set, get) => ({
     prices: { ...START_PRICES },
     priceDirections: {},
     sequences: {},
@@ -93,13 +104,13 @@ export function createAppStore(options: StoreOptions) {
     },
 
     setAlerts(alerts) { set({ alerts }); },
-  }));
+  })));
 }
 
 export const useAppStore = createAppStore({
   seed: 20260729,
   tradeCount: 250,
-  now: Date.UTC(2026, 6, 29),
+  now: NOW,
 });
 
 /** Same store, named for non-hook consumers such as the alert engine. */

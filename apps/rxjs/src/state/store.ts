@@ -1,5 +1,6 @@
 import {
-  BehaviorSubject, Subject, Subscription, combineLatest, map, scan, shareReplay, startWith,
+  BehaviorSubject, Subject, Subscription, combineLatest, concatMap, map, scan, shareReplay,
+  startWith,
 } from 'rxjs';
 import type { Observable } from 'rxjs';
 import {
@@ -20,6 +21,10 @@ export const DAILY_LOSS_LIMIT = 400;
 export const RISK_LIMIT_PER_TRADE = 100;
 
 const INDEX_BY_ID = new Map(INSTRUMENTS.map((instrument, index) => [instrument.id, index]));
+
+export function alertKey(alert: Alert): string {
+  return `${alert.kind}:${alert.subjectId}`;
+}
 
 export interface StoreOptions {
   seed: number;
@@ -107,7 +112,6 @@ export function createAppStore(options: StoreOptions): AppStore {
   const selectedInstrumentId$ = new BehaviorSubject<InstrumentId | null>(INSTRUMENTS[0]?.id ?? null);
   const feedRate$ = new BehaviorSubject<number>(10);
   const screen$ = new BehaviorSubject<Screen>('terminal');
-  const alertListeners = new Set<(alert: Alert) => void>();
 
   const emptyPriceState: PriceState = { prices: { ...START_PRICES }, sequences: {} };
   // One array, shared by the scan seed, the startWith and the connect seed.
@@ -239,7 +243,8 @@ export function createAppStore(options: StoreOptions): AppStore {
 
   const alertContext$ = combineLatest([positionsSource$, priceState$, tradesSource$]).pipe(
     map(([positions, priceState, trades]): AlertContext => {
-      const now = Date.now();
+      // The frozen clock, not Date.now() — see the note in the alert engine.
+      const now = options.now;
       return {
         now,
         dailyPnl: positions.reduce(
@@ -261,40 +266,48 @@ export function createAppStore(options: StoreOptions): AppStore {
     }),
   );
 
+  const alertSets$ = alertContext$.pipe(
+    map(evaluateAlerts),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
   /**
    * Firing once per transition falls out of the pipeline: `scan` carries the
    * previous key set and emits only what is newly triggered. Zustand needs a
    * hand-maintained Set for the same guarantee — this is the clearest single
    * illustration of what a stream model buys you.
+   *
+   * One `scan` per subscriber, deliberately. The first version shared a single
+   * eager subscription, so the initial alert set was classified as fired and
+   * pushed into an empty listener set at construction — every listener that
+   * registered afterwards, which is all of them, received nothing ever. A
+   * per-subscriber scan starts from an empty key set, so a late subscriber is
+   * told about everything currently triggered and then only about transitions.
    */
-  const alerts$ = alertContext$.pipe(
-    map(evaluateAlerts),
+  const firedAlerts$: Observable<Alert> = alertSets$.pipe(
     scan(
-      (previous: { alerts: Alert[]; keys: Set<string>; fired: Alert[] }, alerts: Alert[]) => {
-        const keys = new Set(alerts.map((alert) => `${alert.kind}:${alert.subjectId}`));
-        const fired = alerts.filter(
-          (alert) => !previous.keys.has(`${alert.kind}:${alert.subjectId}`),
-        );
-        const unchanged =
-          previous.alerts.length === alerts.length &&
-          previous.alerts.every((alert, index) => {
-            const next = alerts[index];
-            return next !== undefined
-              && alert.kind === next.kind
-              && alert.subjectId === next.subjectId;
-          });
-        return { alerts: unchanged ? previous.alerts : alerts, keys, fired };
-      },
-      { alerts: [] as Alert[], keys: new Set<string>(), fired: [] as Alert[] },
+      (previous: { keys: Set<string>; fired: Alert[] }, alerts: Alert[]) => ({
+        keys: new Set(alerts.map(alertKey)),
+        fired: alerts.filter((alert) => !previous.keys.has(alertKey(alert))),
+      }),
+      { keys: new Set<string>(), fired: [] as Alert[] },
     ),
-    shareReplay({ bufferSize: 1, refCount: false }),
+    concatMap(({ fired }) => fired),
   );
 
-  subscriptions.add(alerts$.subscribe(({ fired }) => {
-    for (const alert of fired) {
-      for (const listener of alertListeners) listener(alert);
-    }
-  }));
+  /** Holds the previous array whenever the alert set is unchanged, so the list
+   *  component is not handed a new reference on every quote. */
+  const alertList$ = alertSets$.pipe(
+    scan((previous: Alert[], alerts: Alert[]) => {
+      const unchanged = previous.length === alerts.length
+        && previous.every((alert, index) => {
+          const next = alerts[index];
+          return next !== undefined && alertKey(alert) === alertKey(next);
+        });
+      return unchanged ? previous : alerts;
+    }, [] as Alert[]),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
 
   const store: AppStore = {
     instrumentRows$: connect(instrumentRows$, initialRows, subscriptions),
@@ -302,7 +315,7 @@ export function createAppStore(options: StoreOptions): AppStore {
     accountTotals$: connect(
       accountTotals$, { totalPnl: 0, usedRisk: 0, drawdown: 0 }, subscriptions,
     ),
-    alerts$: connect(alerts$.pipe(map(({ alerts }) => alerts)), [], subscriptions),
+    alerts$: connect(alertList$, [], subscriptions),
     journalRows$: connect(journalRows$, [], subscriptions),
     journalStats$: connect(
       journalStats$,
@@ -326,8 +339,8 @@ export function createAppStore(options: StoreOptions): AppStore {
       );
     },
     onAlertFired(listener) {
-      alertListeners.add(listener);
-      return () => { alertListeners.delete(listener); };
+      const subscription = firedAlerts$.subscribe(listener);
+      return () => { subscription.unsubscribe(); };
     },
     destroy() {
       subscriptions.unsubscribe();

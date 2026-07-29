@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { INSTRUMENTS, STRATEGIES } from '@smc/domain';
 import { EquityChart, FilterBar, JournalTable, StatsPanel, TESTID } from '@smc/ui';
@@ -13,6 +14,13 @@ export function JournalScreen() {
   const rows = useSelector(selectJournalRows);
   const stats = useSelector(selectJournalStats);
   const curve = useSelector(selectEquityCurve);
+  // Stable identity: JournalTable forwards this to a memoised JournalRow.
+  const handleEdit = useCallback(
+    (id: string, patch: { strategy?: string; note?: string }) => {
+      dispatch(tradeEdited({ id, patch }));
+    },
+    [dispatch],
+  );
 
   return (
     <div data-testid={TESTID.screenJournal} className="journal">
@@ -27,7 +35,7 @@ export function JournalScreen() {
       <JournalTable
         rows={rows}
         strategies={STRATEGIES}
-        onEdit={(id, patch) => dispatch(tradeEdited({ id, patch }))}
+        onEdit={handleEdit}
       />
     </div>
   );

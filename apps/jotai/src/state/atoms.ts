@@ -1,5 +1,7 @@
 import { atom } from 'jotai';
-import { atomFamily } from 'jotai/utils';
+// jotai/utils' atomFamily is deprecated and is removed in Jotai v3; the
+// official replacement is this package, same API.
+import { atomFamily } from 'jotai-family';
 import {
   INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
   maxDrawdown, mulberry32, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
@@ -104,19 +106,31 @@ export const editTradeAtom = atom(
 
 // --- Terminal derivations ---------------------------------------------------
 
-export const positionRowsAtom = atom((get): PositionRowModel[] =>
-  get(positionsAtom).map((position) => {
-    const markPrice = get(priceAtomFamily(position.instrumentId)).price;
-    return {
-      id: position.id,
-      instrumentId: position.instrumentId,
-      side: position.side,
-      size: position.size,
-      entryPrice: position.entryPrice,
-      markPrice,
-      unrealizedPnl: unrealizedPnl(position, markPrice),
-    };
-  }));
+/**
+ * Derived per position, for the same reason instrument rows are. Doing it in
+ * one atom over the whole array — which is what this file used to do — meant a
+ * tick on any position's instrument handed React.memo six new row objects
+ * instead of one. The atom graph gives fine-grained invalidation, but only at
+ * the granularity you actually build it at; it is not automatic.
+ */
+export const positionRowAtomFamily = atomFamily((id: string) => atom((get): PositionRowModel | null => {
+  const position = get(positionsAtom).find((candidate) => candidate.id === id);
+  if (position === undefined) return null;
+  const markPrice = get(priceAtomFamily(position.instrumentId)).price;
+  return {
+    id: position.id,
+    instrumentId: position.instrumentId,
+    side: position.side,
+    size: position.size,
+    entryPrice: position.entryPrice,
+    markPrice,
+    unrealizedPnl: unrealizedPnl(position, markPrice),
+  };
+}));
+
+export const positionRowsAtom = atom((get): PositionRowModel[] => get(positionsAtom)
+  .map((position) => get(positionRowAtomFamily(position.id)))
+  .filter((row): row is PositionRowModel => row !== null));
 
 export const accountTotalsAtom = atom((get) => {
   let totalPnl = 0;
@@ -172,7 +186,11 @@ export const equityCurveAtom = atom((get): EquityPoint[] => equityCurve(get(filt
 export const alertContextAtom = atom((get): AlertContext => {
   const positions = get(positionsAtom);
   const trades = get(tradesAtom);
-  const now = Date.now();
+  // The frozen clock, not Date.now(). Reading a live clock here made this a
+  // derivation whose value changed without any of its inputs changing, so the
+  // seeded alert set drifted with the calendar: two alerts on the fixture date,
+  // five today, all six positions eventually. All five apps freeze it alike.
+  const now = NOW;
   return {
     now,
     dailyPnl: positions.reduce(

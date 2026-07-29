@@ -5,6 +5,11 @@ import { useBehavior } from '../state/useBehavior';
 
 const INSTRUMENT_IDS = INSTRUMENTS.map((instrument) => instrument.id);
 
+// Hoisted, not inline — see the note in the MobX screen. Same bug, same fix.
+const handleEdit = (id: string, patch: { strategy?: string; note?: string }) => {
+  appStore.editTrade(id, patch);
+};
+
 export function JournalScreen() {
   const filter = useBehavior(appStore.filter$);
   const rows = useBehavior(appStore.journalRows$);
@@ -24,7 +29,7 @@ export function JournalScreen() {
       <JournalTable
         rows={rows}
         strategies={STRATEGIES}
-        onEdit={(id, patch) => appStore.editTrade(id, patch)}
+        onEdit={handleEdit}
       />
     </div>
   );

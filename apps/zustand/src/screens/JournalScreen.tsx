@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow';
 import { INSTRUMENTS, STRATEGIES } from '@smc/domain';
 import { EquityChart, FilterBar, JournalTable, StatsPanel, TESTID } from '@smc/ui';
 import { useAppStore } from '../state/store';
@@ -12,9 +13,9 @@ export function JournalScreen() {
   const setFilter = useAppStore((state) => state.setFilter);
   const editTrade = useAppStore((state) => state.editTrade);
 
-  const rows = useAppStore(selectJournalRows);
-  const stats = useAppStore(selectJournalStats);
-  const curve = useAppStore(selectEquityCurve);
+  const rows = useAppStore(useShallow(selectJournalRows));
+  const stats = useAppStore(useShallow(selectJournalStats));
+  const curve = useAppStore(useShallow(selectEquityCurve));
 
   return (
     <div data-testid={TESTID.screenJournal} className="journal">

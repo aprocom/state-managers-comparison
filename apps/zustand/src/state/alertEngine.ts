@@ -30,10 +30,11 @@ export function buildAlertContext(state: AppState, now: number): AlertContext {
 }
 
 /**
- * Zustand has no derivation graph, so the engine re-evaluates on every store
- * change and diffs the result against the previously fired keys by hand. The
- * bookkeeping below is exactly the cost this comparison is meant to expose —
- * MobX and Jotai express the same behaviour declaratively.
+ * Zustand has no derivation graph, so firing once per transition is a hand-kept
+ * key Set — that part is a genuine cost and the comparison should quote it.
+ * Deciding *when* to re-evaluate is not: subscribeWithSelector watches the
+ * three slices the rules actually read, so a quote for an instrument nobody
+ * holds does not re-run a 250-trade sort.
  */
 export function attachAlertEngine(
   store: ReturnType<typeof createAppStore>,
@@ -58,5 +59,9 @@ export function attachAlertEngine(
   };
 
   evaluate(store.getState());
-  return store.subscribe(evaluate);
+  return store.subscribe(
+    (state) => [state.prices, state.positions, state.trades] as const,
+    () => { evaluate(store.getState()); },
+    { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] },
+  );
 }

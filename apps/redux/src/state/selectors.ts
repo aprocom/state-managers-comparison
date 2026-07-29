@@ -6,6 +6,7 @@ import {
 import type { Alert, AlertContext, EquityPoint, InstrumentId, Trade } from '@smc/domain';
 import type { InstrumentRowModel, JournalRowModel, PositionRowModel } from '@smc/ui';
 import type { RootState } from './slice';
+import { positionsAdapter, tradesAdapter } from './slice';
 
 export const DAILY_LOSS_LIMIT = 400;
 export const RISK_LIMIT_PER_TRADE = 100;
@@ -15,15 +16,22 @@ const PRECISIONS = new Map(INSTRUMENTS.map((i) => [i.id, i.pricePrecision]));
 
 const selectPrices = (state: RootState) => state.app.prices;
 const selectDirections = (state: RootState) => state.app.priceDirections;
-const selectPositions = (state: RootState) => state.app.positions;
-const selectTrades = (state: RootState) => state.app.trades;
 const selectFilter = (state: RootState) => state.app.filter;
+
+// The adapters' own selectors. `selectAll` is memoised on the entity state, and
+// trades come back newest-first from the adapter's sortComparer, so nothing
+// downstream has to re-sort.
+const tradeSelectors = tradesAdapter.getSelectors((state: RootState) => state.app.trades);
+const positionSelectors = positionsAdapter.getSelectors((state: RootState) => state.app.positions);
+const selectTrades = tradeSelectors.selectAll;
+const selectPositions = positionSelectors.selectAll;
 
 /**
  * Redux derives nothing on its own, so every view model here is a reselect
  * memoised selector — the same manual derivation layer Zustand needs, just
  * with a library behind it. The per-row identity cache below is likewise hand
- * written; MobX and Jotai get it from their dependency graphs for free.
+ * written; MobX per-instrument computeds and Jotai atom families get it from
+ * their dependency graphs instead.
  */
 const instrumentRowCache = new Map<InstrumentId, InstrumentRowModel>();
 
@@ -99,9 +107,8 @@ export const selectFilteredTrades = createSelector(
 
 export const selectJournalRows = createSelector(
   [selectFilteredTrades],
+  // Already newest-first from the adapter's sortComparer.
   (trades): JournalRowModel[] => trades
-    .slice()
-    .sort((a, b) => b.closedAt - a.closedAt)
     .map((trade) => ({
       id: trade.id,
       instrumentId: trade.instrumentId,
@@ -131,7 +138,9 @@ export const selectEquityCurve = createSelector(
 );
 
 export function buildAlertContext(state: RootState, now: number): AlertContext {
-  const { positions, prices, trades } = state.app;
+  const { prices } = state.app;
+  const positions = selectPositions(state);
+  const trades = selectTrades(state);
   return {
     now,
     dailyPnl: positions.reduce(
@@ -141,7 +150,7 @@ export function buildAlertContext(state: RootState, now: number): AlertContext {
     ),
     dailyLossLimit: DAILY_LOSS_LIMIT,
     riskLimitPerTrade: RISK_LIMIT_PER_TRADE,
-    recentClosedTrades: [...trades].sort((a, b) => b.closedAt - a.closedAt),
+    recentClosedTrades: trades,
     openPositions: positions.map((position) => ({
       position,
       holdingMs: now - position.openedAt,
