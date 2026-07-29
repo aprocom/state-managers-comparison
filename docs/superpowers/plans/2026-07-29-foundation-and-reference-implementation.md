@@ -1362,11 +1362,14 @@ Create `packages/ui/package.json`:
 }
 ```
 
-Create `packages/ui/tsconfig.json`:
+Create `packages/ui/tsconfig.json`. The explicit `types` entry is required — without it `tsc` never loads the jest-dom matcher declarations and `toHaveTextContent` fails to compile even though the test passes at runtime:
 
 ```json
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["@testing-library/jest-dom"]
+  },
   "include": ["src"]
 }
 ```
@@ -2056,10 +2059,12 @@ describe('InstrumentTable', () => {
 Run:
 
 ```bash
-npm install -D -w . @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom @vitejs/plugin-react
+npm install -D @testing-library/react @testing-library/user-event @testing-library/jest-dom jsdom "@vitejs/plugin-react@^5"
 npm install -w @smc/ui react@^19 react-dom@^19
 npm install -D -w @smc/ui @types/react @types/react-dom
 ```
+
+Two things about that first command. Root dev dependencies install without `-w` — `npm install -w .` errors with "No workspaces found". And `@vitejs/plugin-react` must be pinned to `^5`: version 6 requires Vite 8 as a peer, while Vitest 3 brings Vite 7, and npm refuses the tree. Do not reach for `--legacy-peer-deps` here; the version pin is the actual fix.
 
 Replace `vitest.config.ts`:
 
@@ -2070,7 +2075,6 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   plugins: [react()],
   test: {
-    setupFiles: ['./vitest.setup.ts'],
     projects: [
       {
         extends: true,
@@ -2086,6 +2090,8 @@ export default defineConfig({
           name: 'dom',
           include: ['packages/ui/**/*.test.{ts,tsx}', 'apps/**/*.test.{ts,tsx}'],
           environment: 'jsdom',
+          // jsdom-only: the setup file pulls in Testing Library, which needs a DOM.
+          setupFiles: ['./vitest.setup.ts'],
         },
       },
     ],
@@ -2097,7 +2103,16 @@ Create `vitest.setup.ts`:
 
 ```ts
 import '@testing-library/jest-dom/vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach } from 'vitest';
+
+// Testing Library only auto-cleans when Vitest globals are enabled. They are
+// not, so unmount explicitly — otherwise each render leaks into the next test
+// and `getByTestId` starts finding duplicates.
+afterEach(cleanup);
 ```
+
+The `afterEach(cleanup)` is not optional. Without it the second and third tests in Step 9 fail with "Found multiple elements by: [data-testid=...]".
 
 Extend the root `typecheck` script now that a second package exists:
 
@@ -2108,7 +2123,7 @@ Extend the root `typecheck` script now that a second package exists:
 - [ ] **Step 11: Run the tests to verify they pass**
 
 Run: `npx vitest run`
-Expected: PASS — 52 domain tests plus 7 UI tests.
+Expected: PASS — 52 domain tests plus 6 UI tests, 58 in total.
 
 - [ ] **Step 12: Commit**
 
@@ -2226,7 +2241,7 @@ Create `apps/zustand/package.json`:
     "zustand": "^5.0.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
     "vite": "^7.0.0"
   }
 }
