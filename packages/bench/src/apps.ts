@@ -11,4 +11,5 @@ export interface AppTarget {
  */
 export const APP_TARGETS: AppTarget[] = [
   { name: 'zustand', workspace: '@smc/app-zustand', port: 4173 },
+  { name: 'rxjs', workspace: '@smc/app-rxjs', port: 4174 },
 ];
