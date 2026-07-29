@@ -1,8 +1,14 @@
 import { useEffect } from 'react';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
+import type { InstrumentId } from '@smc/domain';
 import { appStore } from '../state/store';
 import { useBehavior } from '../state/useBehavior';
+
+// Hoisted so the prop identity is stable across renders. An inline arrow here
+// changes on every render and defeats React.memo on all fifty rows, which
+// would make this implementation look far slower than it is.
+const selectInstrument = (id: InstrumentId) => appStore.selectInstrument(id);
 
 export function TerminalScreen() {
   const feedRate = useBehavior(appStore.feedRate$);
@@ -35,7 +41,7 @@ export function TerminalScreen() {
       <InstrumentTable
         rows={instrumentRows}
         selectedId={selectedId}
-        onSelect={(id) => appStore.selectInstrument(id)}
+        onSelect={selectInstrument}
       />
     </div>
   );

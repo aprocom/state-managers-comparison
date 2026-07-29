@@ -9,7 +9,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
-          include: ['packages/domain/**/*.test.ts'],
+          include: ['packages/domain/**/*.test.ts', 'packages/bench/**/*.test.ts'],
           environment: 'node',
         },
       },

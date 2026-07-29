@@ -56,3 +56,18 @@ describe('createFeed', () => {
     expect(received).toHaveLength(2);
   });
 });
+
+describe('createFeed — rate accuracy', () => {
+  it('delivers the configured rate for values below the batch frequency', async () => {
+    const feed = createFeed({ instruments, seed: 1, updatesPerSecond: 10, startPrices });
+    let received = 0;
+    feed.subscribe(() => { received += 1; });
+    feed.start();
+    await new Promise((resolve) => { setTimeout(resolve, 1000); });
+    feed.stop();
+    // 10/s over ~1s, allowing for timer jitter. Before the fractional carry
+    // this returned ~20 because each batch was rounded up to one quote.
+    expect(received).toBeGreaterThanOrEqual(7);
+    expect(received).toBeLessThanOrEqual(13);
+  });
+});

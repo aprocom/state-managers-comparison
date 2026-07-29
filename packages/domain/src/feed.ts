@@ -68,8 +68,17 @@ export function createFeed(options: FeedOptions): Feed {
     },
     start() {
       if (timer !== null) return;
-      const perBatch = Math.max(1, Math.round(options.updatesPerSecond / BATCHES_PER_SECOND));
-      timer = setInterval(() => emit(perBatch, Date.now()), 1000 / BATCHES_PER_SECOND);
+      // Carry the fractional remainder instead of rounding up to one quote per
+      // batch. Rounding made every rate below 20/s actually deliver 20/s, which
+      // silently doubled any per-quote benchmark metric.
+      const perBatch = options.updatesPerSecond / BATCHES_PER_SECOND;
+      let carry = 0;
+      timer = setInterval(() => {
+        carry += perBatch;
+        const count = Math.floor(carry);
+        carry -= count;
+        if (count > 0) emit(count, Date.now());
+      }, 1000 / BATCHES_PER_SECOND);
     },
     stop() {
       if (timer === null) return;

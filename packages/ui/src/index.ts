@@ -1,5 +1,6 @@
 export * from './testids';
 export * from './format';
+export * from './renderCounter';
 export * from './InstrumentTable';
 export * from './PositionsPanel';
 export * from './AccountSummary';

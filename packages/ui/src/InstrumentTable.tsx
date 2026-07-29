@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { InstrumentId } from '@smc/domain';
 import { formatPrice } from './format';
+import { countRender } from './renderCounter';
 import { TESTID } from './testids';
 
 export interface InstrumentRowModel {
@@ -23,6 +24,7 @@ interface RowProps {
  * not. That difference is a headline metric, so the component must not hide it.
  */
 const InstrumentRow = memo(function InstrumentRow({ row, selected, onSelect }: RowProps) {
+  countRender('instrumentRow');
   return (
     <tr
       data-testid={TESTID.instrumentRow(row.id)}

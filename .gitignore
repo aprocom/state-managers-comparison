@@ -8,5 +8,5 @@ coverage/
 !.env.example
 playwright-report/
 test-results/
-bench-results/*.json
-!bench-results/.gitkeep
+# Benchmark output is committed — the published numbers must be reproducible.
+

@@ -3,7 +3,11 @@ import { observer } from 'mobx-react-lite';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Alert } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
+import type { InstrumentId } from '@smc/domain';
 import { appStore, attachAlertEngine } from '../state/store';
+
+// Hoisted for a stable prop identity — see the note in the RxJS screen.
+const selectInstrument = (id: InstrumentId) => appStore.selectInstrument(id);
 
 export const TerminalScreen = observer(function TerminalScreen() {
   const [firedAlerts, setFiredAlerts] = useState<Alert[]>([]);
@@ -36,7 +40,7 @@ export const TerminalScreen = observer(function TerminalScreen() {
       <InstrumentTable
         rows={appStore.instrumentRows}
         selectedId={appStore.selectedInstrumentId}
-        onSelect={(id) => appStore.selectInstrument(id)}
+        onSelect={selectInstrument}
       />
     </div>
   );

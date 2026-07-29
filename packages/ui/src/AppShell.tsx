@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 import { TESTID } from './testids';
 
-export const FEED_RATES = [10, 50, 100];
+// 1000/s is a stress rate, well past anything a real venue sends. Lighter
+// rates turned out not to separate the implementations at all, so the high
+// end is where the comparison has to look.
+export const FEED_RATES = [10, 100, 1000];
 
 export function AppShell(props: {
   title: string;

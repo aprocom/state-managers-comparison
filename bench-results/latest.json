@@ -1,0 +1,571 @@
+{
+  "soakMs": 6000,
+  "repeats": 3,
+  "results": [
+    {
+      "name": "zustand",
+      "samples": [
+        {
+          "rate": 10,
+          "repeat": 0,
+          "elapsedMs": 6005,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9991673605328893,
+          "fps": 60.116569525395505,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 1,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9993337774816791,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 0,
+          "elapsedMs": 6002,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9996667777407532,
+          "fps": 59.980006664445185,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 1,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.999333777481679,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        }
+      ]
+    },
+    {
+      "name": "rxjs",
+      "samples": [
+        {
+          "rate": 10,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 1,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9993337774816791,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 2,
+          "elapsedMs": 6005,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9991673605328893,
+          "fps": 59.950041631973356,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 1,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.999333777481679,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        }
+      ]
+    },
+    {
+      "name": "mobx",
+      "samples": [
+        {
+          "rate": 10,
+          "repeat": 0,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 42,
+          "rendersPerQuote": 0.9993337774816791,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 42,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 42,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 0,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 144,
+          "rendersPerQuote": 0.999333777481679,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 1,
+          "elapsedMs": 6002,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 144,
+          "rendersPerQuote": 0.9996667777407532,
+          "fps": 59.980006664445185,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 144,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 0,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9993337774816788,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 1,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9993337774816788,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 2,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9993337774816788,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        }
+      ]
+    },
+    {
+      "name": "jotai",
+      "samples": [
+        {
+          "rate": 10,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 42,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 42,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 2,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 42,
+          "rendersPerQuote": 0.9993337774816791,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 144,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 144,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 144,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 0,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 6050,
+          "positionRowRenders": 726,
+          "rendersPerQuote": 1.007661558960693,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 1,
+          "elapsedMs": 6004,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9993337774816788,
+          "fps": 59.96002664890074,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 2,
+          "elapsedMs": 6002,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9996667777407531,
+          "fps": 59.980006664445185,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        }
+      ]
+    },
+    {
+      "name": "redux",
+      "samples": [
+        {
+          "rate": 10,
+          "repeat": 0,
+          "elapsedMs": 6002,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9996667777407532,
+          "fps": 59.980006664445185,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 10,
+          "repeat": 2,
+          "elapsedMs": 6002,
+          "instrumentRowRenders": 60,
+          "positionRowRenders": 7,
+          "rendersPerQuote": 0.9996667777407532,
+          "fps": 59.980006664445185,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 0,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 100,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 600,
+          "positionRowRenders": 72,
+          "rendersPerQuote": 0.9995002498750626,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 0,
+          "elapsedMs": 6002,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9996667777407531,
+          "fps": 59.980006664445185,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 1,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        },
+        {
+          "rate": 1000,
+          "repeat": 2,
+          "elapsedMs": 6003,
+          "instrumentRowRenders": 6000,
+          "positionRowRenders": 720,
+          "rendersPerQuote": 0.9995002498750625,
+          "fps": 59.97001499250375,
+          "longTaskCount": 0,
+          "longTaskMs": 0,
+          "heapBytes": 10000000
+        }
+      ]
+    }
+  ]
+}

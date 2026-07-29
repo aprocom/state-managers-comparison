@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
-import type { Alert } from '@smc/domain';
+import type { Alert, InstrumentId } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import { appStore, instrumentSelected, quoteApplied } from '../state/slice';
 import type { AppDispatch, RootState } from '../state/slice';
@@ -19,6 +19,13 @@ export function TerminalScreen() {
   const totals = useSelector(selectAccountTotals);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  // Stable prop identity. An inline arrow would change every render and defeat
+  // React.memo on all fifty rows, misreporting Redux as far slower than it is.
+  const onSelect = useCallback(
+    (id: InstrumentId) => dispatch(instrumentSelected(id)),
+    [dispatch],
+  );
 
   useEffect(
     () => attachAlertEngine(appStore, {
@@ -52,7 +59,7 @@ export function TerminalScreen() {
       <InstrumentTable
         rows={instrumentRows}
         selectedId={selectedId}
-        onSelect={(id) => dispatch(instrumentSelected(id))}
+        onSelect={onSelect}
       />
     </div>
   );

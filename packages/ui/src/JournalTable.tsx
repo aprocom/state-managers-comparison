@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { InstrumentId, Side } from '@smc/domain';
 import { formatSignedMoney } from './format';
+import { countRender } from './renderCounter';
 import { TESTID } from './testids';
 
 export interface JournalRowModel {
@@ -21,6 +22,7 @@ interface RowProps {
 }
 
 const JournalRow = memo(function JournalRow({ row, strategies, onEdit }: RowProps) {
+  countRender('journalRow');
   return (
     <tr data-testid={TESTID.tradeRow(row.id)}>
       <td>{new Date(row.closedAt).toISOString().slice(0, 10)}</td>

@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { InstrumentId, Side } from '@smc/domain';
 import { formatPrice, formatSignedMoney } from './format';
+import { countRender } from './renderCounter';
 import { TESTID } from './testids';
 
 export interface PositionRowModel {
@@ -14,6 +15,7 @@ export interface PositionRowModel {
 }
 
 const PositionRow = memo(function PositionRow({ row }: { row: PositionRowModel }) {
+  countRender('positionRow');
   return (
     <tr data-testid={TESTID.positionRow(row.id)}>
       <td>{row.instrumentId}</td>
