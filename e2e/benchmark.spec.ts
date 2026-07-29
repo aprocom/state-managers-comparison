@@ -208,9 +208,15 @@ test('benchmark — all implementations, interleaved', async ({ page }) => {
     await measure(page, cdp, target.port, 100, -1, 1);
   }
 
-  for (const cpuThrottle of CPU_THROTTLES) {
-    for (let repeat = 0; repeat < REPEATS; repeat += 1) {
-      for (const rate of RATES) {
+  for (let repeat = 0; repeat < REPEATS; repeat += 1) {
+    for (const rate of RATES) {
+      // Throttle level is inside the repeat loop, not outside it. With it
+      // outside, every 1x sample was taken before every 4x sample and the
+      // difference between conditions was confounded with time-in-run — the
+      // exact bias interleaving the implementations was meant to remove, one
+      // level up. Found by noticing that MobX measured *cheaper* under 4x
+      // throttling than without it, which is not a thing throttling can do.
+      for (const cpuThrottle of CPU_THROTTLES) {
         for (const target of APP_TARGETS) {
           samplesByApp.get(target.name)!.push(
             await measure(page, cdp, target.port, rate, repeat, cpuThrottle),
