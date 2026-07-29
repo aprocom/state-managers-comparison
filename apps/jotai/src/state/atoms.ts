@@ -42,6 +42,10 @@ export const priceAtomFamily = atomFamily((id: InstrumentId) => atom<PriceCell>(
   seq: 0,
 }));
 
+/** One boolean atom per instrument, so pinning one does not invalidate the
+ *  other forty-nine rows. */
+export const pinnedAtomFamily = atomFamily((_id: InstrumentId) => atom(false));
+
 /** Derived per instrument, so an untouched instrument keeps its row identity. */
 export const instrumentRowAtomFamily = atomFamily((id: InstrumentId) => atom((get): InstrumentRowModel => {
   const cell = get(priceAtomFamily(id));
@@ -52,11 +56,23 @@ export const instrumentRowAtomFamily = atomFamily((id: InstrumentId) => atom((ge
     price: cell.price,
     precision: instrument?.pricePrecision ?? 2,
     changeDirection: cell.direction,
+    pinned: get(pinnedAtomFamily(id)),
   };
 }));
 
-export const instrumentRowsAtom = atom((get): InstrumentRowModel[] =>
-  INSTRUMENTS.map((instrument) => get(instrumentRowAtomFamily(instrument.id))));
+export const togglePinAtom = atom(null, (get, set, id: InstrumentId) => {
+  const pinAtom = pinnedAtomFamily(id);
+  set(pinAtom, !get(pinAtom));
+});
+
+export const instrumentRowsAtom = atom((get): InstrumentRowModel[] => {
+  const rows = INSTRUMENTS.map((instrument) => get(instrumentRowAtomFamily(instrument.id)));
+  const pinned = rows.filter((row) => row.pinned);
+  return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
+});
+
+export const pinnedCountAtom = atom((get) => INSTRUMENTS
+  .reduce((count, instrument) => count + (get(pinnedAtomFamily(instrument.id)) ? 1 : 0), 0));
 
 export const applyQuoteAtom = atom(null, (get, set, quote: Quote) => {
   const cellAtom = priceAtomFamily(quote.instrumentId);

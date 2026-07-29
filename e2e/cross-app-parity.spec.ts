@@ -37,6 +37,18 @@ async function readVector(page: Page, port: number): Promise<Record<string, stri
       .join(','));
   vector['alerts'] = alertIds;
 
+  // Pin two instruments and read the resulting order. Ordering is independent
+  // of the price stream, so it is comparable across apps; the count is too.
+  await page.getByTestId(TESTID.instrumentPin('SOL-USDT')).click();
+  await page.getByTestId(TESTID.instrumentPin('DOGE-USDT')).click();
+  vector['pinned.count'] = (await page.getByTestId(TESTID.accountPinned).textContent()) ?? '';
+  vector['pinned.order'] = await page.getByTestId(TESTID.instrumentTable)
+    .locator('tbody tr')
+    .evaluateAll((tableRows) => tableRows
+      .slice(0, 4)
+      .map((row) => row.getAttribute('data-testid') ?? '')
+      .join(','));
+
   await page.getByTestId(TESTID.navJournal).click();
   await expect(page.getByTestId(TESTID.screenJournal)).toBeVisible();
 

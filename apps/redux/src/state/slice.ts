@@ -37,6 +37,7 @@ export interface AppState {
   positions: EntityState<Position, string>;
   trades: EntityState<Trade, string>;
   selectedInstrumentId: InstrumentId | null;
+  pinned: InstrumentId[];
   feedRate: number;
   screen: Screen;
   filter: JournalFilter;
@@ -69,6 +70,7 @@ export function createInitialState(
       tradesAdapter.getInitialState(), createTradeHistory(seed, tradeCount, now),
     ),
     selectedInstrumentId: INSTRUMENTS[0]?.id ?? null,
+    pinned: [],
     feedRate: 10,
     screen: 'terminal',
     filter: { strategy: null, side: null, instrumentId: null },
@@ -99,6 +101,11 @@ const appSlice = createSlice({
     instrumentSelected(state, action: PayloadAction<InstrumentId>) {
       state.selectedInstrumentId = action.payload;
     },
+    pinToggled(state, action: PayloadAction<InstrumentId>) {
+      const index = state.pinned.indexOf(action.payload);
+      if (index === -1) state.pinned.push(action.payload);
+      else state.pinned.splice(index, 1);
+    },
     feedRateSet(state, action: PayloadAction<number>) {
       state.feedRate = action.payload;
     },
@@ -121,7 +128,7 @@ const appSlice = createSlice({
 });
 
 export const {
-  quoteApplied, instrumentSelected, feedRateSet, screenSet, filterSet, tradeEdited,
+  quoteApplied, instrumentSelected, pinToggled, feedRateSet, screenSet, filterSet, tradeEdited,
 } = appSlice.actions;
 
 export function createAppStore(preloadedState?: AppState) {

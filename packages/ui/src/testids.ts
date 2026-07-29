@@ -11,6 +11,7 @@ export const TESTID = {
   navJournal: 'nav-journal',
   feedRate: (rate: number) => `feed-rate-${rate}`,
 
+  instrumentTable: 'instrument-table',
   instrumentRow: (id: string) => `instrument-row-${id}`,
   instrumentPrice: (id: string) => `instrument-price-${id}`,
   instrumentPin: (id: string) => `instrument-pin-${id}`,

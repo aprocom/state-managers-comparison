@@ -17,6 +17,7 @@ const PRECISIONS = new Map(INSTRUMENTS.map((i) => [i.id, i.pricePrecision]));
 const selectPrices = (state: RootState) => state.app.prices;
 const selectDirections = (state: RootState) => state.app.priceDirections;
 const selectFilter = (state: RootState) => state.app.filter;
+const selectPinned = (state: RootState) => state.app.pinned;
 
 // The adapters' own selectors. `selectAll` is memoised on the entity state, and
 // trades come back newest-first from the adapter's sortComparer, so nothing
@@ -36,27 +37,37 @@ const selectPositions = positionSelectors.selectAll;
 const instrumentRowCache = new Map<InstrumentId, InstrumentRowModel>();
 
 export const selectInstrumentRows = createSelector(
-  [selectPrices, selectDirections],
-  (prices, directions): InstrumentRowModel[] => INSTRUMENTS.map((instrument) => {
-    const price = prices[instrument.id] ?? 0;
-    const changeDirection = directions[instrument.id] ?? 'flat';
-    const cached = instrumentRowCache.get(instrument.id);
-    if (cached !== undefined
-      && cached.price === price
-      && cached.changeDirection === changeDirection) {
-      return cached;
-    }
-    const row: InstrumentRowModel = {
-      id: instrument.id,
-      label: LABELS.get(instrument.id) ?? instrument.id,
-      price,
-      precision: PRECISIONS.get(instrument.id) ?? 2,
-      changeDirection,
-    };
-    instrumentRowCache.set(instrument.id, row);
-    return row;
-  }),
+  [selectPrices, selectDirections, selectPinned],
+  (prices, directions, pinnedIds): InstrumentRowModel[] => {
+    const pinnedSet = new Set(pinnedIds);
+    const rows = INSTRUMENTS.map((instrument) => {
+      const price = prices[instrument.id] ?? 0;
+      const changeDirection = directions[instrument.id] ?? 'flat';
+      const isPinned = pinnedSet.has(instrument.id);
+      const cached = instrumentRowCache.get(instrument.id);
+      if (cached !== undefined
+        && cached.price === price
+        && cached.changeDirection === changeDirection
+        && cached.pinned === isPinned) {
+        return cached;
+      }
+      const row: InstrumentRowModel = {
+        id: instrument.id,
+        label: LABELS.get(instrument.id) ?? instrument.id,
+        price,
+        precision: PRECISIONS.get(instrument.id) ?? 2,
+        changeDirection,
+        pinned: isPinned,
+      };
+      instrumentRowCache.set(instrument.id, row);
+      return row;
+    });
+    const pinned = rows.filter((row) => row.pinned);
+    return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
+  },
 );
+
+export const selectPinnedCount = createSelector([selectPinned], (pinned) => pinned.length);
 
 const positionRowCache = new Map<string, PositionRowModel>();
 

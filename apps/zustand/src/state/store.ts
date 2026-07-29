@@ -16,6 +16,7 @@ export interface AppState {
   positions: Position[];
   trades: Trade[];
   selectedInstrumentId: InstrumentId | null;
+  pinned: InstrumentId[];
   feedRate: number;
   screen: Screen;
   filter: JournalFilter;
@@ -23,6 +24,7 @@ export interface AppState {
 
   applyQuote(quote: Quote): void;
   selectInstrument(id: InstrumentId): void;
+  togglePin(id: InstrumentId): void;
   setFeedRate(rate: number): void;
   setScreen(screen: Screen): void;
   setFilter(filter: JournalFilter): void;
@@ -69,6 +71,7 @@ export function createAppStore(options: StoreOptions) {
     positions: seedPositions(options.seed, options.now),
     trades: createTradeHistory(options.seed, options.tradeCount, options.now),
     selectedInstrumentId: INSTRUMENTS[0]?.id ?? null,
+    pinned: [],
     feedRate: 10,
     screen: 'terminal',
     filter: { strategy: null, side: null, instrumentId: null },
@@ -93,6 +96,12 @@ export function createAppStore(options: StoreOptions) {
     },
 
     selectInstrument(id) { set({ selectedInstrumentId: id }); },
+    togglePin(id) {
+      const { pinned } = get();
+      set({
+        pinned: pinned.includes(id) ? pinned.filter((other) => other !== id) : [...pinned, id],
+      });
+    },
     setFeedRate(rate) { set({ feedRate: rate }); },
     setScreen(screen) { set({ screen }); },
     setFilter(filter) { set({ filter }); },

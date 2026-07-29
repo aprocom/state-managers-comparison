@@ -113,13 +113,35 @@ Regenerate with `npm run metrics`.
 
 | | Bundle (gzip) | State-layer SLOC | Files | Wiring SLOC outside the state layer |
 |---|---:|---:|---:|---:|
-| **Jotai** | 68.6 kB | 187 | 2 | 124 |
-| **MobX** | 82.6 kB | 247 | 1 | 104 |
-| **Zustand** | 65.4 kB | 268 | 3 | 111 |
-| **Redux Toolkit** | 77.6 kB | 290 | 3 | 140 |
-| **RxJS** | 71.8 kB | 305 | 2 | 110 |
+| **Jotai** | 68.9 kB | 198 | 2 | 131 |
+| **MobX** | 82.9 kB | 262 | 1 | 106 |
+| **Zustand** | 65.7 kB | 289 | 3 | 120 |
+| **Redux Toolkit** | 77.9 kB | 307 | 3 | 146 |
+| **RxJS** | 72.1 kB | 332 | 2 | 113 |
 
 SLOC is non-blank, non-comment lines, so an implementation is not penalised for explaining itself. Bundle size is gzip -9 of the emitted JS and includes React and the shared packages in every figure — only the *deltas* between rows are library cost. The wiring column is counted separately on purpose: excluding it entirely flatters whichever library pushes work into the screens, and folding it in flatters whichever pushes it into the store.
+
+### Cost of change
+
+The axis nobody publishes. All five were frozen at a tag, the **same** feature was added to each, and the diff was measured. The feature: pin an instrument, pinned rows sort to the top of the table keeping their relative order, a pinned count appears in the account summary, and pins survive a screen switch. It was chosen because it needs new state, a new action, a re-ordering of an existing derivation that must not break row identity, and a new cross-cutting aggregate — not because any library handles it especially well.
+
+The shared half of the change (the pin button, the row model field, the testids, the parity tests) is identical for all five and excluded. Regenerate with `git diff --shortstat before-pin-feature -- apps/<name>`.
+
+| | Files touched | Lines added | Lines of working code modified | State-layer diff |
+|---|---:|---:|---:|---:|
+| **MobX** | 2 | 22 | 2 | +19 / −1 |
+| **Jotai** | 2 | 28 | 5 | +18 / −2 |
+| **Zustand** | 3 | 38 | 5 | +26 / −2 |
+| **RxJS** | 2 | 42 | 8 | +38 / −7 |
+| **Redux Toolkit** | 3 | 49 | 24 | +39 / −21 |
+
+The third column is the one that matters: how much already-working code the change had to disturb. MobX needed two lines touched — one observable and one action on the existing per-instrument model, and the row computed picked the field up. Jotai added a parallel atom family and a write atom without touching the existing ones.
+
+RxJS is the interesting case. Adding a *second kind of event* to a `scan` that previously consumed only quotes meant merging two streams and widening the accumulator's input type, so the incremental-derivation core had to be reopened and rewritten. The stream model gives excellent per-row identity for free and charges for it when the shape of the input changes.
+
+**Redux's 24 is partly an artifact and should be read with that caveat.** Adding a third input to a `createSelector` converted an expression body to a block body, which re-indented the surrounding lines; perhaps eight of the 24 are genuine. Even discounted, it is the largest, and the reason is structural: the state, the action, the reducer case, the selector and the component are five separate edit sites by design. That separation is exactly what Redux is bought for on a large team — it is a cost that buys something, not a defect.
+
+One measurement, one feature, one author. It is a data point, not a law; a feature shaped differently would rank these differently. But it is a *measured* data point on the axis where the literature has none.
 
 ### Where the correctness burden falls
 
@@ -153,7 +175,7 @@ The limitations, at the same level of detail as the results. This section exists
 
 **Five samples per cell.** Enough to compute an interval and run a rank test, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
 
-**The change-cost axis is not measured yet.** See below.
+**The change-cost result is one feature, measured once, by the person who wrote all five implementations.** A differently shaped feature would rank them differently, and I had already spent weeks inside each codebase. Treat it as a data point, not a law.
 
 **I am not a neutral party.** I wrote all five implementations. The defence against that is the cross-app parity suite, the fact that each library is used the way its own docs prescribe, and that every bug found in my own favour is documented above rather than quietly fixed.
 
@@ -196,7 +218,7 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 - [x] **Functional parity** — 41 e2e tests, including exact cross-app equality of derived state
 - [x] **Benchmark harness** — CPU, interaction latency, frame pacing, TBT, render granularity, at two CPU conditions, with confidence intervals and significance tests
 - [x] **Reproducible complexity metrics** — `npm run metrics`, CI-enforced
-- [ ] **Change-cost experiment** — freeze all five at a tag, add the same feature to each, measure diff size, files touched, and working code that had to change. This is the axis nobody publishes and the one engineering managers actually pay for.
+- [x] **Change-cost experiment** — same feature added to all five from a frozen tag, diff measured
 - [ ] **Concurrency safety** — run dai-shi's tearing suite against all five
 - [ ] **Live demo** on GitHub Pages with an implementation switcher
 

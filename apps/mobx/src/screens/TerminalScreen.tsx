@@ -9,6 +9,7 @@ import { appStore, attachAlertEngine } from '../state/store';
 
 // Hoisted for a stable prop identity — see the note in the RxJS screen.
 const selectInstrument = (id: InstrumentId) => appStore.selectInstrument(id);
+const togglePin = (id: InstrumentId) => appStore.togglePin(id);
 
 export const TerminalScreen = observer(function TerminalScreen() {
   const [firedAlerts, setFiredAlerts] = useState<Alert[]>([]);
@@ -48,12 +49,13 @@ export const TerminalScreen = observer(function TerminalScreen() {
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
       <AlertList alerts={firedAlerts} />
-      <AccountSummary {...appStore.accountTotals} />
+      <AccountSummary {...appStore.accountTotals} pinnedCount={appStore.pinnedCount} />
       <PositionsPanel rows={appStore.positionRows} />
       <InstrumentTable
         rows={appStore.instrumentRows}
         selectedId={appStore.selectedInstrumentId}
         onSelect={selectInstrument}
+        onTogglePin={togglePin}
       />
     </div>
   );

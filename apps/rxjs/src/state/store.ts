@@ -1,5 +1,5 @@
 import {
-  BehaviorSubject, Subject, Subscription, combineLatest, concatMap, map, scan, shareReplay,
+  BehaviorSubject, Subject, Subscription, combineLatest, concatMap, map, merge, scan, shareReplay,
   startWith,
 } from 'rxjs';
 import type { Observable } from 'rxjs';
@@ -52,7 +52,14 @@ function initialInstrumentRows(): InstrumentRowModel[] {
     price: START_PRICES[instrument.id] ?? 0,
     precision: instrument.pricePrecision,
     changeDirection: 'flat' as PriceDirection,
+    pinned: false,
   }));
+}
+
+/** Stable partition: pinned rows first, each group keeping its original order. */
+function orderPinnedFirst(rows: InstrumentRowModel[]): InstrumentRowModel[] {
+  const pinned = rows.filter((row) => row.pinned);
+  return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
 }
 
 interface PriceState {
@@ -62,6 +69,7 @@ interface PriceState {
 
 export interface AppStore {
   readonly instrumentRows$: BehaviorSubject<InstrumentRowModel[]>;
+  readonly pinnedCount$: BehaviorSubject<number>;
   readonly positionRows$: BehaviorSubject<PositionRowModel[]>;
   readonly accountTotals$: BehaviorSubject<{ totalPnl: number; usedRisk: number; drawdown: number }>;
   readonly alerts$: BehaviorSubject<Alert[]>;
@@ -78,6 +86,7 @@ export interface AppStore {
 
   applyQuote(quote: Quote): void;
   selectInstrument(id: InstrumentId): void;
+  togglePin(id: InstrumentId): void;
   setFeedRate(rate: number): void;
   setScreen(screen: Screen): void;
   setFilter(filter: JournalFilter): void;
@@ -112,6 +121,7 @@ export function createAppStore(options: StoreOptions): AppStore {
   const selectedInstrumentId$ = new BehaviorSubject<InstrumentId | null>(INSTRUMENTS[0]?.id ?? null);
   const feedRate$ = new BehaviorSubject<number>(10);
   const screen$ = new BehaviorSubject<Screen>('terminal');
+  const pinToggles$ = new Subject<InstrumentId>();
 
   const emptyPriceState: PriceState = { prices: { ...START_PRICES }, sequences: {} };
   // One array, shared by the scan seed, the startWith and the connect seed.
@@ -137,22 +147,41 @@ export function createAppStore(options: StoreOptions): AppStore {
    * component re-renders for one instrument instead of fifty. No hand-written
    * cache is needed — the operator does it.
    */
-  const instrumentRows$ = quotes$.pipe(
-    scan((rows: InstrumentRowModel[], quote: Quote) => {
-      const index = INDEX_BY_ID.get(quote.instrumentId);
+  const rowEvents$: Observable<Quote | { pin: InstrumentId }> = merge(
+    quotes$,
+    pinToggles$.pipe(map((id) => ({ pin: id }))),
+  );
+
+  const orderedRows$ = rowEvents$.pipe(
+    scan((rows: InstrumentRowModel[], event: Quote | { pin: InstrumentId }) => {
+      if ('pin' in event) {
+        const index = INDEX_BY_ID.get(event.pin);
+        if (index === undefined) return rows;
+        const current = rows[index];
+        if (current === undefined) return rows;
+        const next = rows.slice();
+        next[index] = { ...current, pinned: !current.pinned };
+        return next;
+      }
+      const index = INDEX_BY_ID.get(event.instrumentId);
       if (index === undefined) return rows;
       const current = rows[index];
-      if (current === undefined || current.price === quote.price) return rows;
+      if (current === undefined || current.price === event.price) return rows;
       const next = rows.slice();
       next[index] = {
         ...current,
-        price: quote.price,
-        changeDirection: quote.price > current.price ? 'up' : 'down',
+        price: event.price,
+        changeDirection: event.price > current.price ? 'up' : 'down',
       };
       return next;
     }, initialRows),
     startWith(initialRows),
     shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
+  const instrumentRows$ = orderedRows$.pipe(map(orderPinnedFirst));
+  const pinnedCount$ = orderedRows$.pipe(
+    map((rows) => rows.reduce((count, row) => count + (row.pinned ? 1 : 0), 0)),
   );
 
   const positionRowCache = new Map<string, PositionRowModel>();
@@ -311,6 +340,7 @@ export function createAppStore(options: StoreOptions): AppStore {
 
   const store: AppStore = {
     instrumentRows$: connect(instrumentRows$, initialRows, subscriptions),
+    pinnedCount$: connect(pinnedCount$, 0, subscriptions),
     positionRows$: connect(positionRows$, [], subscriptions),
     accountTotals$: connect(
       accountTotals$, { totalPnl: 0, usedRisk: 0, drawdown: 0 }, subscriptions,
@@ -330,6 +360,7 @@ export function createAppStore(options: StoreOptions): AppStore {
 
     applyQuote(quote) { quotes$.next(quote); },
     selectInstrument(id) { selectedInstrumentId$.next(id); },
+    togglePin(id) { pinToggles$.next(id); },
     setFeedRate(rate) { feedRate$.next(rate); },
     setScreen(screen) { screen$.next(screen); },
     setFilter(filter) { filterSource$.next(filter); },

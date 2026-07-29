@@ -25,6 +25,7 @@ export const RISK_LIMIT_PER_TRADE = 100;
 class InstrumentModel {
   price: number;
   direction: PriceDirection = 'flat';
+  pinned = false;
   private seq = 0;
 
   constructor(private readonly instrument: Instrument) {
@@ -32,10 +33,16 @@ class InstrumentModel {
     makeObservable<InstrumentModel, 'seq'>(this, {
       price: observable,
       direction: observable,
+      pinned: observable,
       seq: observable,
       row: computed,
       applyQuote: action,
+      togglePin: action,
     });
+  }
+
+  togglePin(): void {
+    this.pinned = !this.pinned;
   }
 
   get id(): InstrumentId {
@@ -57,6 +64,7 @@ class InstrumentModel {
       price: this.price,
       precision: this.instrument.pricePrecision,
       changeDirection: this.direction,
+      pinned: this.pinned,
     };
   }
 }
@@ -157,6 +165,7 @@ export class AppStore {
       filter: observable,
 
       instrumentRows: computed,
+      pinnedCount: computed,
       positionRows: computed,
       accountTotals: computed,
       filteredTrades: computed,
@@ -167,6 +176,7 @@ export class AppStore {
 
       applyQuote: action,
       selectInstrument: action,
+      togglePin: action,
       setFeedRate: action,
       setScreen: action,
       setFilter: action,
@@ -181,6 +191,8 @@ export class AppStore {
   }
 
   selectInstrument(id: InstrumentId): void { this.selectedInstrumentId = id; }
+
+  togglePin(id: InstrumentId): void { this.modelsById.get(id)?.togglePin(); }
   setFeedRate(rate: number): void { this.feedRate = rate; }
   setScreen(screen: Screen): void { this.screen = screen; }
   setFilter(filter: JournalFilter): void { this.filter = filter; }
@@ -192,7 +204,13 @@ export class AppStore {
   // --- Derived state ---------------------------------------------------------
 
   get instrumentRows(): InstrumentRowModel[] {
-    return this.instruments.map((model) => model.row);
+    const rows = this.instruments.map((model) => model.row);
+    const pinned = rows.filter((row) => row.pinned);
+    return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
+  }
+
+  get pinnedCount(): number {
+    return this.instruments.reduce((count, model) => count + (model.pinned ? 1 : 0), 0);
   }
 
   private priceOf(instrumentId: InstrumentId, fallback: number): number {

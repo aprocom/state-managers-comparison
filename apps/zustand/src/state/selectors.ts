@@ -49,16 +49,25 @@ function memoizeOne<A extends readonly unknown[], R>(
 
 const instrumentRowCache = new Map<InstrumentId, InstrumentRowModel>();
 
+/** Stable partition: pinned rows first, each group keeping its original order. */
+export function orderPinnedFirst(rows: InstrumentRowModel[]): InstrumentRowModel[] {
+  const pinned = rows.filter((row) => row.pinned);
+  return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
+}
+
 export function selectInstrumentRows(state: AppState): InstrumentRowModel[] {
-  return INSTRUMENTS.map((instrument) => {
+  const pinned = new Set(state.pinned);
+  const rows = INSTRUMENTS.map((instrument) => {
     const price = state.prices[instrument.id] ?? 0;
     const changeDirection = state.priceDirections[instrument.id] ?? 'flat';
+    const isPinned = pinned.has(instrument.id);
     const cached = instrumentRowCache.get(instrument.id);
     // Preserve row identity when nothing about that row moved, so the memoised
     // InstrumentRow only re-renders for instruments that actually ticked.
     if (cached !== undefined
       && cached.price === price
-      && cached.changeDirection === changeDirection) {
+      && cached.changeDirection === changeDirection
+      && cached.pinned === isPinned) {
       return cached;
     }
     const row: InstrumentRowModel = {
@@ -67,10 +76,16 @@ export function selectInstrumentRows(state: AppState): InstrumentRowModel[] {
       price,
       precision: PRECISIONS.get(instrument.id) ?? 2,
       changeDirection,
+      pinned: isPinned,
     };
     instrumentRowCache.set(instrument.id, row);
     return row;
   });
+  return orderPinnedFirst(rows);
+}
+
+export function selectPinnedCount(state: AppState): number {
+  return state.pinned.length;
 }
 
 const positionRowCache = new Map<string, PositionRowModel>();

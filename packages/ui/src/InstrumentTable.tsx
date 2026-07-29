@@ -61,7 +61,7 @@ export function InstrumentTable(props: {
   onTogglePin(id: InstrumentId): void;
 }) {
   return (
-    <table className="table">
+    <table className="table" data-testid={TESTID.instrumentTable}>
       <thead>
         <tr><th aria-label="Pinned" /><th>Instrument</th><th>Price</th></tr>
       </thead>

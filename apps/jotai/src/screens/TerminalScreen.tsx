@@ -6,7 +6,7 @@ import type { Alert } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import {
   accountTotalsAtom, alertsAtom, applyQuoteAtom, feedRateAtom, instrumentRowsAtom,
-  positionRowsAtom, selectedInstrumentIdAtom,
+  pinnedCountAtom, positionRowsAtom, selectedInstrumentIdAtom, togglePinAtom,
 } from '../state/atoms';
 import { appStore, attachAlertEngine } from '../state/store';
 
@@ -18,6 +18,8 @@ export function TerminalScreen() {
   const selectedId = useAtomValue(selectedInstrumentIdAtom);
   const setSelected = useSetAtom(selectedInstrumentIdAtom);
   const applyQuote = useSetAtom(applyQuoteAtom);
+  const togglePin = useSetAtom(togglePinAtom);
+  const pinnedCount = useAtomValue(pinnedCountAtom);
 
   const [firedAlerts, setFiredAlerts] = useState<Alert[]>(() => appStore.get(alertsAtom));
 
@@ -56,9 +58,14 @@ export function TerminalScreen() {
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
       <AlertList alerts={firedAlerts} />
-      <AccountSummary {...totals} />
+      <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
-      <InstrumentTable rows={instrumentRows} selectedId={selectedId} onSelect={setSelected} />
+      <InstrumentTable
+        rows={instrumentRows}
+        selectedId={selectedId}
+        onSelect={setSelected}
+        onTogglePin={togglePin}
+      />
     </div>
   );
 }

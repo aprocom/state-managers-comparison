@@ -11,7 +11,11 @@ export default defineConfig({
   webServer: APP_TARGETS.map((target) => ({
     command: `npm run preview -w ${target.workspace} -- --port ${target.port} --strictPort`,
     port: target.port,
-    reuseExistingServer: process.env['CI'] === undefined,
+    // Never reuse. A server left over from an earlier build keeps serving the
+    // old dist, and Playwright says nothing — a benchmark run that straddles a
+    // rebuild silently mixes samples from two different versions of the app.
+    // That happened here once and cost a full run.
+    reuseExistingServer: false,
     timeout: 120_000,
   })),
 });

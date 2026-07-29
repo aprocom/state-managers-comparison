@@ -5,13 +5,16 @@ import type { Feed } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import { NOW, appStore, useAppStore } from '../state/store';
 import { attachAlertEngine } from '../state/alertEngine';
-import { selectAccountTotals, selectInstrumentRows, selectPositionRows } from '../state/selectors';
+import {
+  selectAccountTotals, selectInstrumentRows, selectPinnedCount, selectPositionRows,
+} from '../state/selectors';
 
 export function TerminalScreen() {
   const feedRate = useAppStore((state) => state.feedRate);
   const applyQuote = useAppStore((state) => state.applyQuote);
   const selectedId = useAppStore((state) => state.selectedInstrumentId);
   const selectInstrument = useAppStore((state) => state.selectInstrument);
+  const togglePin = useAppStore((state) => state.togglePin);
 
   // useShallow is Zustand's own answer to "my selector returns a new array
   // every time": the selector still runs, but the component only re-renders
@@ -19,6 +22,7 @@ export function TerminalScreen() {
   const instrumentRows = useAppStore(useShallow(selectInstrumentRows));
   const positionRows = useAppStore(useShallow(selectPositionRows));
   const totals = useAppStore(useShallow(selectAccountTotals));
+  const pinnedCount = useAppStore(selectPinnedCount);
   const alerts = useAppStore((state) => state.alerts);
 
   useEffect(
@@ -56,9 +60,14 @@ export function TerminalScreen() {
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
       <AlertList alerts={alerts} />
-      <AccountSummary {...totals} />
+      <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
-      <InstrumentTable rows={instrumentRows} selectedId={selectedId} onSelect={selectInstrument} />
+      <InstrumentTable
+        rows={instrumentRows}
+        selectedId={selectedId}
+        onSelect={selectInstrument}
+        onTogglePin={togglePin}
+      />
     </div>
   );
 }

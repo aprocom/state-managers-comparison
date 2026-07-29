@@ -28,6 +28,23 @@ for (const target of APP_TARGETS) {
       await expect(page.getByTestId(TESTID.alert('risk-per-trade'))).toBeVisible();
     });
 
+    test('pins an instrument to the top of the table', async ({ page }) => {
+      await page.getByTestId(TESTID.instrumentPin('SOL-USDT')).click();
+      await expect(page.getByTestId(TESTID.accountPinned)).toHaveText('1');
+      const firstRow = page.getByTestId(TESTID.instrumentTable).locator('tbody tr').first();
+      await expect(firstRow).toHaveAttribute('data-testid', TESTID.instrumentRow('SOL-USDT'));
+
+      await page.getByTestId(TESTID.instrumentPin('SOL-USDT')).click();
+      await expect(page.getByTestId(TESTID.accountPinned)).toHaveText('0');
+    });
+
+    test('keeps pins across a screen switch', async ({ page }) => {
+      await page.getByTestId(TESTID.instrumentPin('ETH-USDT')).click();
+      await page.getByTestId(TESTID.navJournal).click();
+      await page.getByTestId(TESTID.navTerminal).click();
+      await expect(page.getByTestId(TESTID.accountPinned)).toHaveText('1');
+    });
+
     test('switches to the journal', async ({ page }) => {
       await page.getByTestId(TESTID.navJournal).click();
       await expect(page.getByTestId(TESTID.screenJournal)).toBeVisible();

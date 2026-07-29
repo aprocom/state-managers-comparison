@@ -10,6 +10,7 @@ import { useBehavior } from '../state/useBehavior';
 // changes on every render and defeats React.memo on all fifty rows, which
 // would make this implementation look far slower than it is.
 const selectInstrument = (id: InstrumentId) => appStore.selectInstrument(id);
+const togglePin = (id: InstrumentId) => appStore.togglePin(id);
 
 export function TerminalScreen() {
   const feedRate = useBehavior(appStore.feedRate$);
@@ -18,6 +19,7 @@ export function TerminalScreen() {
   const totals = useBehavior(appStore.accountTotals$);
   const alerts = useBehavior(appStore.alerts$);
   const selectedId = useBehavior(appStore.selectedInstrumentId$);
+  const pinnedCount = useBehavior(appStore.pinnedCount$);
 
   const feedRef = useRef<Feed | null>(null);
 
@@ -49,12 +51,13 @@ export function TerminalScreen() {
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
       <AlertList alerts={alerts} />
-      <AccountSummary {...totals} />
+      <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
       <InstrumentTable
         rows={instrumentRows}
         selectedId={selectedId}
         onSelect={selectInstrument}
+        onTogglePin={togglePin}
       />
     </div>
   );

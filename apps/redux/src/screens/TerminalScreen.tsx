@@ -4,10 +4,10 @@ import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Feed } from '@smc/domain';
 import type { Alert, InstrumentId } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
-import { NOW, appStore, instrumentSelected, quoteApplied } from '../state/slice';
+import { NOW, appStore, instrumentSelected, pinToggled, quoteApplied } from '../state/slice';
 import type { AppDispatch, RootState } from '../state/slice';
 import {
-  selectAccountTotals, selectInstrumentRows, selectPositionRows,
+  selectAccountTotals, selectInstrumentRows, selectPinnedCount, selectPositionRows,
 } from '../state/selectors';
 import { attachAlertEngine } from '../state/alertEngine';
 
@@ -18,11 +18,17 @@ export function TerminalScreen() {
   const instrumentRows = useSelector(selectInstrumentRows);
   const positionRows = useSelector(selectPositionRows);
   const totals = useSelector(selectAccountTotals);
+  const pinnedCount = useSelector(selectPinnedCount);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
   // Stable prop identity. An inline arrow would change every render and defeat
   // React.memo on all fifty rows, misreporting Redux as far slower than it is.
+  const onTogglePin = useCallback(
+    (id: InstrumentId) => { dispatch(pinToggled(id)); },
+    [dispatch],
+  );
+
   const onSelect = useCallback(
     (id: InstrumentId) => dispatch(instrumentSelected(id)),
     [dispatch],
@@ -67,12 +73,13 @@ export function TerminalScreen() {
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
       <AlertList alerts={alerts} />
-      <AccountSummary {...totals} />
+      <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
       <InstrumentTable
         rows={instrumentRows}
         selectedId={selectedId}
         onSelect={onSelect}
+        onTogglePin={onTogglePin}
       />
     </div>
   );
