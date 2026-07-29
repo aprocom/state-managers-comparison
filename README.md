@@ -1,10 +1,23 @@
 # State Managers Comparison
 
-Five React state managers, one non-trivial application, measured instead of argued about.
+Five React state managers, one non-trivial application, measured properly — including the parts where the measurement says nothing.
 
 **RxJS · Redux Toolkit · MobX · Zustand · Jotai**
 
-The same app is built five times. Everything except the state layer is shared — domain types, all P&L and statistics math, every presentational component. The implementations differ *only* in how state is stored, derived and propagated. That constraint is what makes the numbers comparable: a difference in lines of code or render time cannot come from anything else.
+The same app is built five times. Everything except the state layer is shared: domain types, all P&L and statistics maths, every presentational component. The implementations differ *only* in how state is stored, derived and propagated, and a cross-app test suite asserts that all five produce byte-identical derived state before any of them is timed.
+
+**If you read one section, read [What this cannot tell you](#what-this-cannot-tell-you).** It is the point of the project. A comparison whose author has not tried to break it is a rumour with numbers attached.
+
+---
+
+## The short version
+
+1. **On this workload, the state manager is not the bottleneck** — but that sentence has to be earned, not asserted, and the earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
+2. **What separates the five is main-thread CPU**, and only under load. Render counts, frame rate and long tasks are identical across all five and would be identical across a deliberately broken implementation too, at the rate this project used to headline.
+3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work — more than every architectural difference between the five combined.
+4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
+
+---
 
 ## Why these five
 
@@ -12,99 +25,188 @@ They span distinct paradigms rather than being five variations on one idea.
 
 | | Paradigm | What it is under test for |
 |---|---|---|
-| **RxJS** | Streams | High-frequency updates, backpressure, temporal operators |
-| **Redux Toolkit** | Centralised flux | Normalisation, listener middleware, boilerplate vs. predictability |
+| **RxJS** | Streams | High-frequency updates, temporal operators, incremental derivation via `scan` |
+| **Redux Toolkit** | Centralised flux | Normalisation via `createEntityAdapter`, listener middleware, boilerplate vs. predictability |
 | **MobX** | Transparent reactivity | Fine-grained invalidation, `reaction`, "magic" as a maintenance risk |
-| **Zustand** | Minimal hook store | Manual selectors, the price of minimalism at scale |
-| **Jotai** | Bottom-up atoms | Granularity, composing derived atoms, `atomEffect` |
+| **Zustand** | Minimal hook store | `useShallow`, `subscribeWithSelector`, the price of minimalism at scale |
+| **Jotai** | Bottom-up atoms | Granularity, composing derived atoms, atom families |
 
-Deliberately excluded: Recoil (archived), XState (models logic rather than storing state — a different class of tool), Effector (strong library, narrow hiring geography).
+Deliberately excluded: **Recoil** — archived 1 January 2025, last npm publish March 2023, never got React 18 concurrent support. **XState** — models logic rather than storing state, a different class of tool. **Effector** — a strong library, but see [the note on it below](#a-note-on-effector).
+
+Each implementation is written the way that library's own documentation says to write it. This is not a courtesy; an earlier version hand-rolled a memoiser Zustand ships and skipped the two Redux APIs the table above claims Redux is under test for, which meant the complexity axis was measuring me rather than the libraries.
+
+---
 
 ## The reference application
 
-**TraderCat Lite** — a trading terminal and journal. Two screens that stress state in opposite ways:
+**TraderCat Lite** — a trading terminal and journal. Two screens that stress state in opposite ways.
 
-**Terminal** — a stream of 10/100/1000 quote updates per second across 50 instruments. Open positions whose unrealised P&L is recomputed on every tick. This is where update frequency and render granularity show up.
+**Terminal** — a seeded quote stream at 10/100/1000 updates per second across 50 instruments, six open positions whose unrealised P&L is recomputed on every tick, and a live alert panel.
 
-**Journal** — 250 closed trades with filters and heavy aggregates: equity curve, win rate, R-multiple, profit factor, max drawdown, time in trade. This is where normalised entities and derived computation show up.
+**Journal** — 250 closed trades with filters and heavy aggregates: equity curve, win rate, R-multiple, profit factor, max drawdown, time in trade.
 
-**The alert engine** is the heart of the comparison. Four rules borrowed from the real product — daily loss limit, risk per trade, tilt (a losing streak inside a time window), and time in trade — that read across several slices of state at once, depend on time, and must fire exactly once per transition into the triggered state. Every library solves this differently, and the difference is legible in the code without interpretation.
+**The alert engine** is the sharpest part of the comparison. Four rules — daily loss limit, risk per trade, tilt (a losing streak inside a time window), time in trade — that read across several slices of state at once and must fire exactly once per transition *into* the triggered state, and re-arm when it clears. Every library solves this differently and the difference is legible in the code without interpretation.
 
-No backend, no network, no auth. The quote feed is a seeded generator and the trade history is a seeded fixture, so every run reproduces exactly.
+No backend, no network, no auth. The quote feed is a seeded generator, the trade history is a seeded fixture, and the clock is frozen at construction, so the derived state is identical on every run and on every machine.
 
-## What gets measured
+---
 
-**Speed** — row re-renders per quote, frame rate, and long tasks under load, plus per-app bundle size. Collected via Playwright and the Performance API, three runs per rate, median reported. Row renders are counted by instrumentation inside the *shared* components, so the count measures the state layer and nothing else.
+## Methodology
 
-**Complexity** — lines of code in the state layer only, and how many files it is spread across.
+Stated in full, because in this genre the methodology *is* the contribution.
 
-**Maintenance cost** — measured by experiment rather than opinion. Once all five implementations are frozen at a tag, the same new feature is added to each one and the diff size, files touched, and amount of working code that had to change are recorded.
+**Parity first.** Two suites gate the benchmark. `parity.spec.ts` drives all five apps through the same eight functional tests via a shared `data-testid` contract. `cross-app-parity.spec.ts` reads an exact value vector from every implementation — closed-trade statistics under three filters, the first twenty journal rows cell by cell, risk and drawdown totals, the alert key set — and requires all five to be **identical**, not merely individually plausible. Benchmarking apps that behave differently would be meaningless, and the first version of this project did exactly that for weeks without noticing.
+
+**Production builds.** `vite preview` over `vite build` output, React 19 production. StrictMode is on in all five, which does not double-render outside development.
+
+**Interleaved runs.** The outer loop is the repeat, the inner loop is the implementation. Running all of one app's samples consecutively lets thermal drift and background load land entirely on whichever app happened to be running, and that bias is indistinguishable from a result.
+
+**A discarded warm-up per app**, so the first load's JIT tiering and one-time module evaluation do not land in the samples. This means the numbers describe warm, peak performance and not the cold path — a limitation, declared.
+
+**Measured denominators.** The feed counts the quotes it actually delivers and the harness divides by that. The previous version divided by `configuredRate × elapsedSeconds`, a denominator nothing ever verified; one of its published samples read 1.008 renders per quote, a value the metric's own ceiling proves impossible.
+
+**Statistics, not point estimates.** Every median carries a seeded bootstrap 95% confidence interval. Each implementation is tested against the best one on that metric with a two-sided Mann-Whitney U test (tie-corrected, continuity-corrected) — a rank test, because latency and CPU samples are bounded below and right-skewed, not normal. Effect size is Cliff's delta bucketed by the Romano thresholds, so a difference can be statistically real and still reported as practically negligible. **Any row the test does not separate is printed as "not significant" rather than as a ranking.**
+
+**Two CPU conditions**, 1× and 4× via CDP `Emulation.setCPUThrottlingRate`. Every comparison in this genre stops at an unthrottled desktop, which is exactly where nothing differs.
+
+**Metrics chosen for dynamic range**, and the range stated:
+
+| Metric | Why | Ceiling / floor |
+|---|---|---|
+| Main-thread CPU (`ScriptDuration`) | The only metric that separates these five | none |
+| Interaction latency (Event Timing) | The primitive INP is built from; no published state-manager comparison uses it | quantised to 8 ms |
+| p99 inter-frame interval + dropped frames | Mean FPS is capped by vsync and reads 60 until things are catastrophic | 16.7 ms at 60 Hz |
+| Total Blocking Time | Long-task *count* has a 50 ms dead zone this workload never approaches | 0 below 50 ms/task |
+| Row renders per quote | Detects broken memoisation | **see below** |
+
+**The row-render ceiling, which is the single most important caveat in this project.** React coalesces everything one feed batch does into a single commit. The feed emits 20 batches per second, so the worst any implementation can do is re-render all 50 rows once per batch. That makes the maximum readable value `50 × min(rate, 20) / rate` — **50** at 10 updates/sec, **10** at 100, and exactly **1.00** at 1000. At 1000 updates/sec an implementation that re-renders every row scores identically to one that re-renders only the row that changed. The metric is informative at the two lower rates and is pure decoration at the top one. `rendersPerQuoteCeiling()` computes this, it is unit-tested, and it is printed next to every table.
+
+Everything is reproducible: `npm run bench` regenerates the raw samples, `npm run report` regenerates the tables from them, `npm run metrics` regenerates the complexity table from the source tree, and `npm run metrics -- --check` fails the build if the README's table has drifted from the code.
+
+---
 
 ## Results
 
-All five implementations pass the same 40 functional parity tests unchanged, so the numbers below describe apps that genuinely do the same thing.
+All five pass both parity suites unchanged, so the numbers below describe apps that provably do the same thing.
 
-### Speed: there is no difference
+Full tables with confidence intervals and significance tests: **[bench-results/report.md](bench-results/report.md)**. Raw samples: **[bench-results/latest.json](bench-results/latest.json)**.
 
-Measured over 6-second soaks, three repeats, median reported, on Chromium.
+### Render granularity
 
-| Updates/sec | Row renders per quote | FPS | Long-task ms | 
-|---:|---:|---:|---:|
-| 10 | 1.00 — all five | 60 — all five | 0 — all five |
-| 100 | 1.00 — all five | 60 — all five | 0 — all five |
-| 1000 | 1.00 — all five | 60 — all five | 0 — all five |
+All five render exactly one instrument row and one position row per quote, at every rate, under both CPU conditions. At 10 and 100 updates/sec that is a real result — the ceiling is 50 and 10 respectively, so a broken implementation would be plainly visible, and one was:
 
-One row render per quote is the optimal result: exactly the row that changed is re-rendered and nothing else. At 1000 updates per second — well past what any real venue pushes to a browser — every implementation still hits it, holds 60 FPS, and never blocks the main thread for 50 ms.
+> Before the fix, MobX and Jotai re-rendered **all six** position rows per tick where the other three re-rendered one — a 6× difference at 10 updates/sec. Both derived `positionRows` from a single coarse computation over the whole array, so any price change handed `React.memo` six new objects. The instrument table in the same two apps was correctly per-item; only the positions were not. The benchmark measured this from the start, wrote it to `bench-results/latest.json`, and the reporting layer silently dropped the column — so a "no difference" conclusion was published over a 6× difference sitting in the repository.
 
-**The honest conclusion is that on this workload the state manager is not the bottleneck, and choosing between these five on performance grounds is choosing on a non-difference.** JS heap came back identical for all five, but Chromium quantises `performance.memory` heavily, so that measurement is reported here as uninformative rather than as a tie.
+The fix was a per-position `computed` in MobX and a `positionRowAtomFamily` in Jotai. The lesson generalises past this bug: **a dependency graph gives you fine-grained invalidation only at the granularity you actually build it at.** It is not automatic, and the two libraries whose pitch is that it comes for free are the two that got it wrong here.
 
-### The finding that actually matters
+### Main-thread CPU
 
-The first version of this benchmark showed RxJS, MobX and Redux re-rendering all fifty rows on every batch while Zustand and Jotai re-rendered one. That difference was **entirely a bug in the benchmark's own app code**: three of the five screens passed an inline arrow function as the `onSelect` prop, which changes identity on every render and defeats `React.memo` on every row. Zustand and Jotai happened to pass a stable store action.
+This is where the five differ, and it is the axis the render-count metric hid completely. See [bench-results/report.md](bench-results/report.md) for the full tables with intervals and p-values.
 
-Nothing about the libraries caused it. A comparison published before that was caught would have been confidently, quantitatively wrong.
+### Interaction latency, frame pacing, blocking time
 
-Two lessons, and they are the reusable ones:
+Under both CPU conditions, no implementation separated from the others on interaction latency, p99 frame interval, dropped frames or Total Blocking Time. Event Timing quantises to 8 ms and the workload never blocks the main thread for 50 ms, so the honest reading is that **this workload is too easy for these metrics to resolve**, not that the libraries are equal on them. Reporting a tie as a finding would repeat exactly the mistake this project already made once.
 
-1. **Prop identity discipline dominates any difference between these libraries.** One inline arrow cost 50× the render work — far more than any architectural choice between the five.
-2. **A benchmark you have not tried to falsify is a rumour with numbers attached.** The methodology bug is preserved in the git history and in the commit that fixed it rather than quietly rewritten.
+### Complexity
 
-A second methodology bug found the same way: the feed rounded its per-batch quota up, so every configured rate below 20/s actually delivered 20/s and silently doubled every per-quote metric.
+Regenerate with `npm run metrics`.
 
-### Complexity and maintenance cost
+| | Bundle (gzip) | State-layer SLOC | Files | Wiring SLOC outside the state layer |
+|---|---:|---:|---:|---:|
+| **Jotai** | 68.6 kB | 187 | 2 | 124 |
+| **MobX** | 82.6 kB | 247 | 1 | 104 |
+| **Zustand** | 65.4 kB | 268 | 3 | 111 |
+| **Redux Toolkit** | 77.6 kB | 290 | 3 | 140 |
+| **RxJS** | 71.8 kB | 305 | 2 | 110 |
 
-This is where the five genuinely differ.
+SLOC is non-blank, non-comment lines, so an implementation is not penalised for explaining itself. Bundle size is gzip -9 of the emitted JS and includes React and the shared packages in every figure — only the *deltas* between rows are library cost. The wiring column is counted separately on purpose: excluding it entirely flatters whichever library pushes work into the screens, and folding it in flatters whichever pushes it into the store.
 
-| | Bundle (gzip) | State-layer LOC | Files |
-|---|---:|---:|---:|
-| **Jotai** | 68.8 kB | 183 | 2 |
-| **MobX** | 82.4 kB | 229 | 1 |
-| **Redux Toolkit** | 73.9 kB | 264 | 3 |
-| **Zustand** | 64.8 kB | 275 | 3 |
-| **RxJS** | 71.6 kB | 304 | 2 |
+### Where the correctness burden falls
 
-Bundle size and code volume pull in opposite directions. Zustand ships the smallest bundle and needs the most code around it; MobX ships the largest and needs the least. Neither is a verdict — they are different budgets, and 18 kB gzip is not worth 90 lines of hand-written caching to most teams.
+More useful than either table above, because it is what you pay every time someone new touches the code.
 
-**Where the correctness burden falls** is the more useful axis, because it is what you pay every time someone new touches the code:
+*Keeping row identity stable.* MobX gets it from per-instrument and per-position computeds, Jotai from atom families, RxJS from incremental `scan`. Zustand and Redux each need an explicit per-row cache, written and maintained by hand. **But** — see the bug above — MobX and Jotai only get it where you built the graph at that granularity, and getting that wrong is silent. The hand-written cache is more code and more obvious; the graph is less code and fails quietly.
 
-*Keeping row identity stable* — MobX gets it from per-instrument computeds and Jotai from the atom graph; RxJS gets it from incremental `scan`. Zustand and Redux both need an explicit per-row cache written and maintained by hand. In Zustand's case that is compounded by `useSyncExternalStore` demanding a stable reference from every selector, which is why its state layer is the second largest despite the smallest bundle.
+*Firing an alert exactly once per transition.* MobX expresses it as a `reaction` over a computed, RxJS as a `scan` carrying the previous key set. Zustand, Jotai and Redux each need a hand-maintained `Set` of already-fired keys. Redux's listener middleware notifies per *action*, not per transition of the derived value, so it does not remove the bookkeeping — it only removes the decision of when to re-evaluate.
 
-*Firing an alert exactly once per transition* — MobX expresses it as a `reaction` over a computed and RxJS as a `scan` carrying the previous key set. Zustand, Jotai and Redux each need a hand-maintained `Set` of already-fired keys. Note the split: Jotai and Redux derive cheaply but do not model *notification*, so the bookkeeping reappears there.
+*Deciding when to re-evaluate at all.* MobX and Jotai get this from the dependency graph. Zustand has `subscribeWithSelector` and Redux has the listener middleware's `predicate`; both are one-liners, and both were absent from the first version of this project, which is why three implementations were re-running a 250-element sort on every quote while two were not. That asymmetry was invisible to a metric that counts renders.
 
-Every one of those hand-written caches is a place a future contributor can silently break performance — exactly as this project's own benchmark broke it.
+---
+
+## What this cannot tell you
+
+The limitations, at the same level of detail as the results. This section exists because a benchmark without one is advocacy.
+
+**One workload, one shape.** Fifty rows, six positions, 250 trades, one browser, one machine. Nothing here predicts behaviour at 10,000 subscribers, in a collaborative editor, or under SSR.
+
+**No SSR, no hydration, no React Server Components.** For several of these libraries the hydration story is a genuine differentiator and it is entirely unmeasured here.
+
+**Warm, not cold.** A discarded warm-up per app means these are peak numbers. Users experience the cold path, which is not measured.
+
+**Chromium only.** No Firefox, no Safari, no real mobile device — 4× CPU throttling is a model of a mid-range phone, not a phone.
+
+**The row-render metric saturates at the top rate.** Restated because it matters: at 1000 updates/sec that column cannot distinguish an optimal implementation from a fully broken one. It is published with its ceiling next to it rather than quietly dropped, because the previous version of this README leaned on that exact cell as its strongest evidence.
+
+**The journal screen is never benchmarked.** The feed lives in the terminal, so the aggregate-heavy half of the app — where `reselect`, MobX computeds and the atom graph would most plausibly diverge — contributes to the parity suites and to no performance number at all.
+
+**Interaction latency and frame metrics did not resolve anything**, and a tie on a metric that cannot resolve differences is not evidence of equality.
+
+**Five samples per cell.** Enough to compute an interval and run a rank test, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
+
+**The change-cost axis is not measured yet.** See below.
+
+**I am not a neutral party.** I wrote all five implementations. The defence against that is the cross-app parity suite, the fact that each library is used the way its own docs prescribe, and that every bug found in my own favour is documented above rather than quietly fixed.
+
+---
+
+## The bugs this project shipped
+
+Kept because they are more instructive than the results, and because they are all in the git history anyway.
+
+1. **The inline arrow.** Three of five terminal screens passed an inline arrow as `onSelect`, changing identity every render and defeating `React.memo` on all fifty rows. The other two happened to pass a stable store action. The result was a beautiful 50× spread that had **nothing to do with the libraries**. Later found again, unfixed, on the journal screen in four of five apps — where the same bug re-rendered all 250 rows.
+2. **The rounded feed rate.** The feed rounded its per-batch quota up, so every configured rate below 20/s actually delivered 20/s, silently doubling every per-quote metric.
+3. **The dropped position column.** Described above: a real 6× difference, measured, written to disk, and dropped by the report generator.
+4. **The metric with no range.** The headline number could not vary at the rate it was headlined at.
+5. **The test written to the bug.** RxJS subscribed its alert-notification stream at construction, so the initial alert set was consumed by an empty listener list and no listener ever received anything. The test that should have caught it asserted `toHaveLength(0)` where the other four asserted `1` — written to match the observed behaviour rather than the requirement.
+6. **The sequence reset.** Changing the feed rate rebuilt the feed, restarting its per-instrument sequence counter while the stores still held the last sequence they had seen. Every store's staleness guard then silently dropped the next N quotes per instrument — 120 of them at 1000/s. The parity test named *"changes tick rate without breaking the stream"* passed throughout.
+7. **The drifting clock.** Positions were seeded from a fixed date while alerts evaluated against a live `Date.now()`, so the alert set grew with the calendar: two alerts on the fixture date, five a year later. The README claimed every run reproduced exactly.
+
+Every one of these was found by attacking the project's own conclusions after they looked good. Numbers 3 through 7 were found *after* the first version was written up as finished.
+
+---
+
+## Prior art
+
+This project is not the first to build one app several ways.
+
+- **[GantMan/ReactStateMuseum](https://github.com/GantMan/ReactStateMuseum)** — the canonical version: one packing-list app, ~40 state solutions, same rule that only the state decisions differ. It measures nothing, by design.
+- **[gothinkster/realworld](https://github.com/gothinkster/realworld)** — the gold standard for app realism, 100+ implementations against one API spec. Explicitly refuses to measure.
+- **[dai-shi/will-this-react-global-state-work-in-concurrent-rendering](https://github.com/dai-shi/will-this-react-global-state-work-in-concurrent-rendering)** — tearing and concurrency safety across ~23 libraries, as pass/fail. A dimension this project does not cover and should.
+- **[krausest/js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)** and [Nolan Lawson's analysis of its limits](https://nolanlawson.com/2024/10/13/the-greatness-and-limitations-of-the-js-framework-benchmark/) — the limitations section above is written in the register that post established.
+- **[Дмитрий Карловский's reactivity benchmark](https://habr.com/ru/articles/707600/)** — the only comparison I found that gates performance behind *correctness* tests, and the one whose framing most influenced this project's decision to require parity before timing.
+
+What is new here is the combination: same app N ways, *and* real measurement, *and* the measurement's own limits reported as a first-class result.
+
+---
 
 ## Status
 
-- [x] **Foundation** — monorepo, shared domain package, shared component library, parity suite
-- [x] **All five implementations** — 130 unit tests, 40 parity tests, `tsc --strict` clean
-- [x] **Runtime benchmarks** — render counts, FPS, long tasks, at 10/100/1000 updates per second
-- [ ] **Change-cost experiment** — add one feature to all five, measure the diff
-- [ ] **CI and live demo**
+- [x] **Foundation** — monorepo, shared domain package, shared component library
+- [x] **All five implementations** — idiomatic per each library's own docs
+- [x] **Functional parity** — 41 e2e tests, including exact cross-app equality of derived state
+- [x] **Benchmark harness** — CPU, interaction latency, frame pacing, TBT, render granularity, at two CPU conditions, with confidence intervals and significance tests
+- [x] **Reproducible complexity metrics** — `npm run metrics`, CI-enforced
+- [ ] **Change-cost experiment** — freeze all five at a tag, add the same feature to each, measure diff size, files touched, and working code that had to change. This is the axis nobody publishes and the one engineering managers actually pay for.
+- [ ] **Concurrency safety** — run dai-shi's tearing suite against all five
+- [ ] **Live demo** on GitHub Pages with an implementation switcher
 
-## Design and plans
+---
 
-- [Design spec](docs/superpowers/specs/2026-07-29-state-managers-comparison-design.md)
-- [Plan 1 — foundation and reference implementation](docs/superpowers/plans/2026-07-29-foundation-and-reference-implementation.md)
+## A note on Effector
+
+Effector is prominent in Russian-language discussion and largely absent from English-language comparisons, which makes it easy to misjudge in either direction. It was excluded here on hiring reach, not on quality. The most useful public evidence is [VK's twelve-month production post-mortem](https://habr.com/ru/companies/vk/articles/839632/), which names specific structural problems — no dynamic store instances, no garbage collection, depth-first traversal causing redundant recomputation on diamond dependency graphs, and cyclic dependencies that freeze the app with no detection — against [ДомКлик's earlier positive experience](https://habr.com/ru/company/domclick/blog/532016/). Both are real production reports and they disagree; VK's is the better-evidenced of the two.
+
+---
 
 ## Running it
 
@@ -130,7 +232,15 @@ npm run test:e2e
 npm run bench
 ```
 
-The parity suite is the acceptance gate: every implementation must pass the same eight functional tests, driven through a shared set of `data-testid` values, before its performance is measured at all. Benchmarking apps that behave differently would be meaningless.
+```bash
+npm run report
+```
+
+```bash
+npm run metrics
+```
+
+The parity suites are the acceptance gate: every implementation must pass the same functional tests and produce an identical derived-state vector before its performance is measured at all.
 
 ## Licence
 
