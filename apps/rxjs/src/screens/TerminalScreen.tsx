@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
+import type { Feed } from '@smc/domain';
 import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import type { InstrumentId } from '@smc/domain';
 import { appStore } from '../state/store';
@@ -18,6 +19,12 @@ export function TerminalScreen() {
   const alerts = useBehavior(appStore.alerts$);
   const selectedId = useBehavior(appStore.selectedInstrumentId$);
 
+  const feedRef = useRef<Feed | null>(null);
+
+  // The feed is created once and its rate is mutated in place. Rebuilding it on
+  // every rate change restarted its sequence counter while the store kept the
+  // last sequence it had seen, so the store's staleness guard silently dropped
+  // the next N quotes per instrument.
   useEffect(() => {
     const feed = createFeed({
       instruments: INSTRUMENTS,
@@ -25,12 +32,18 @@ export function TerminalScreen() {
       updatesPerSecond: feedRate,
       startPrices: START_PRICES,
     });
+    feedRef.current = feed;
     const unsubscribe = feed.subscribe((quote) => appStore.applyQuote(quote));
     feed.start();
     return () => {
       feed.stop();
       unsubscribe();
+      feedRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    feedRef.current?.setRate(feedRate);
   }, [feedRate]);
 
   return (

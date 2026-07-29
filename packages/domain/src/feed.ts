@@ -12,6 +12,16 @@ export interface Feed {
   subscribe(listener: (quote: Quote) => void): () => void;
   start(): void;
   stop(): void;
+  /**
+   * Change the rate on the running feed. Recreating the feed instead — which
+   * is what every screen used to do when the rate changed — restarted its
+   * per-instrument sequence counter at 1 while the stores still held the last
+   * sequence they had seen, so every store's `seq <= lastSeq` guard silently
+   * dropped quotes until the new feed caught up. At 1000/s that is 120 dropped
+   * quotes per instrument, and the parity test named "changes tick rate
+   * without breaking the stream" passed throughout.
+   */
+  setRate(updatesPerSecond: number): void;
   /** Advance deterministically without timers. Used by tests and benchmarks. */
   tick(count: number, now: number): void;
 }
@@ -30,6 +40,7 @@ export function createFeed(options: FeedOptions): Feed {
 
   const listeners = new Set<(quote: Quote) => void>();
   let cursor = 0;
+  let rate = options.updatesPerSecond;
   let timer: ReturnType<typeof setInterval> | null = null;
 
   function nextQuote(now: number): Quote {
@@ -71,14 +82,16 @@ export function createFeed(options: FeedOptions): Feed {
       // Carry the fractional remainder instead of rounding up to one quote per
       // batch. Rounding made every rate below 20/s actually deliver 20/s, which
       // silently doubled any per-quote benchmark metric.
-      const perBatch = options.updatesPerSecond / BATCHES_PER_SECOND;
       let carry = 0;
       timer = setInterval(() => {
-        carry += perBatch;
+        carry += rate / BATCHES_PER_SECOND;
         const count = Math.floor(carry);
         carry -= count;
         if (count > 0) emit(count, Date.now());
       }, 1000 / BATCHES_PER_SECOND);
+    },
+    setRate(updatesPerSecond) {
+      rate = updatesPerSecond;
     },
     stop() {
       if (timer === null) return;
