@@ -1,3 +1,11 @@
+> **Historical document.** This is the design as written on 2026-07-29, before
+> any of it had been built or measured. It is kept unedited because several of
+> its decisions turned out to be wrong and the record of that is more useful
+> than a tidied-up version. In particular it specifies render counts as the
+> headline performance metric — a metric later shown to have no dynamic range at
+> the top feed rate — and it does not anticipate any of the seven defects listed
+> under "The bugs this project shipped" in the README. Written in Russian.
+
 # State Managers Comparison — дизайн
 
 Дата: 2026-07-29

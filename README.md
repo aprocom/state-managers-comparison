@@ -224,6 +224,13 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 
 ---
 
+## Design history
+
+- [Original design](docs/design/2026-07-29-original-design.md) — written before anything was built, kept unedited. Several of its decisions turned out to be wrong.
+- [Implementation plan](docs/design/2026-07-29-implementation-plan.md) — the first phase, task by task, with the corrections found while executing it.
+
+---
+
 ## A note on Effector
 
 Effector is prominent in Russian-language discussion and largely absent from English-language comparisons, which makes it easy to misjudge in either direction. It was excluded here on hiring reach, not on quality. The most useful public evidence is [VK's twelve-month production post-mortem](https://habr.com/ru/companies/vk/articles/839632/), which names specific structural problems — no dynamic store instances, no garbage collection, depth-first traversal causing redundant recomputation on diamond dependency graphs, and cyclic dependencies that freeze the app with no detection — against [ДомКлик's earlier positive experience](https://habr.com/ru/company/domclick/blog/532016/). Both are real production reports and they disagree; VK's is the better-evidenced of the two.

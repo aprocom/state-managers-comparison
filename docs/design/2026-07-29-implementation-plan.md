@@ -1,3 +1,9 @@
+> **Historical document.** The task-by-task implementation plan for the first
+> phase, written before execution and amended during it — the three corrections
+> recorded inline (a peer-dependency pin, a missing test cleanup, a missing type
+> reference) are the ones found by actually running it. Kept as a record of how
+> the foundation was built, not as current documentation. Written in Russian.
+
 # Foundation & Reference Implementation — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
