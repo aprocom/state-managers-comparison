@@ -13,7 +13,7 @@ The same app is built five times. Everything except the state layer is shared: d
 ## The short version
 
 1. **On this workload, the state manager is not the bottleneck** — but that sentence has to be earned, not asserted, and the earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
-2. **What separates the five is main-thread CPU**, and only under load. Render counts, frame rate and long tasks are identical across all five and would be identical across a deliberately broken implementation too, at the rate this project used to headline.
+2. **What separates the five is main-thread CPU** — a 2.4× spread on identical work, MobX cheapest and Redux most expensive. Render counts, frame rate, interaction latency and blocking time separate nothing, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
 3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work — more than every architectural difference between the five combined.
 4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
 
@@ -65,7 +65,9 @@ Stated in full, because in this genre the methodology *is* the contribution.
 
 **Measured denominators.** The feed counts the quotes it actually delivers and the harness divides by that. The previous version divided by `configuredRate × elapsedSeconds`, a denominator nothing ever verified; one of its published samples read 1.008 renders per quote, a value the metric's own ceiling proves impossible.
 
-**Statistics, not point estimates.** Every median carries a seeded bootstrap 95% confidence interval. Each implementation is tested against the best one on that metric with a two-sided Mann-Whitney U test (tie-corrected, continuity-corrected) — a rank test, because latency and CPU samples are bounded below and right-skewed, not normal. Effect size is Cliff's delta bucketed by the Romano thresholds, so a difference can be statistically real and still reported as practically negligible. **Any row the test does not separate is printed as "not significant" rather than as a ranking.**
+**Statistics, not point estimates.** Every median carries a seeded bootstrap 95% confidence interval. Each implementation is tested against the best one on that metric with a two-sided Mann-Whitney U test — a rank test, because CPU and latency samples are bounded below and right-skewed, not normal — computed **exactly** where the samples are untied. That matters: the normal approximation has a floor of 0.0122 at five samples per group, so an earlier version printed exactly 0.0122 for every significant result and a reader could not tell a decisive separation from a marginal one.
+
+**p-values are Holm-adjusted across all 144 comparisons the report makes.** Running that many tests at α = 0.05 and printing raw values would be expected to produce roughly seven false positives and present them as findings; **9 of the 144 survive the correction.** Effect size is Cliff's delta bucketed by the Romano thresholds, so a difference can be statistically real and still be reported as practically negligible. Any row the test does not separate is printed as "not significant" — which is not evidence of equality, only of undetected difference.
 
 **Two CPU conditions**, 1× and 4× via CDP `Emulation.setCPUThrottlingRate`. Every comparison in this genre stops at an unthrottled desktop, which is exactly where nothing differs.
 
@@ -101,9 +103,23 @@ The fix was a per-position `computed` in MobX and a `positionRowAtomFamily` in J
 
 ### Main-thread CPU
 
-This is the only axis on which the five separate, and it is the one the render-count metric hid completely. Full tables with confidence intervals and Holm-adjusted p-values: **[bench-results/report.md](bench-results/report.md)**.
+The only axis on which the five separate, and the one the render-count metric hid completely.
 
-Read the numbers with this in mind: an earlier version of them was substantially an artifact. Three of the five recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of quotes, because of where the expensive invariant sat in each derivation graph — nothing to do with the libraries. That is fixed, all five now do the same work per quote, and the parity suites hold. But it is the second time this project produced a confident performance ranking that turned out to be measuring its own code, and a third has to be considered live until someone else has looked.
+Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrottled, median of 10 with a bootstrap 95% CI, p Holm-adjusted across all 144 comparisons the report makes:
+
+| | CPU ms/s | p | effect |
+|---|---:|---:|---|
+| **MobX** | 37.2 [35.6–37.7] | — | best |
+| **RxJS** | 44.8 [42.9–46.3] | 0.0016 | large |
+| **Zustand** | 74.4 [73.3–76.9] | 0.0016 | large |
+| **Jotai** | 87.5 [85.3–89.7] | 0.0016 | large |
+| **Redux Toolkit** | 89.2 [81.0–90.4] | 0.0016 | large |
+
+A 2.4× spread between the cheapest and the most expensive, on identical work, verified identical by the cross-app suite. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**.
+
+**Read this ranking knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. All five now do the same work per quote. But this is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
+
+**The 4× CPU-throttling condition does not behave.** Both conditions provably do the same work — the same quotes delivered, the same row renders, the same 60 FPS — and CDP reports roughly *half* the scripting time under throttling. Throttling cannot make identical work cost less, so the counters are not measuring what they claim under `Emulation.setCPUThrottlingRate`, and I have not worked out why. The absolute numbers from that section are not comparable with the unthrottled ones; the ordering within it is, because all five are measured the same way, and it agrees. It is published with that caveat rather than dropped.
 
 ### Interaction latency, frame pacing, blocking time
 
@@ -175,7 +191,7 @@ The limitations, at the same level of detail as the results. This section exists
 
 **Interaction latency and frame metrics did not resolve anything**, and a tie on a metric that cannot resolve differences is not evidence of equality.
 
-**Five samples per cell.** Enough to compute an interval and run a rank test, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
+**Ten samples per cell.** Enough for the exact test to reach p ≈ 10⁻⁵ and survive a 144-way Holm correction, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
 
 **The change-cost result is one feature, measured once, by the person who wrote all five implementations.** A differently shaped feature would rank them differently, and the author knew every codebase intimately before starting the clock. One measurement is a data point, not a law.
 
@@ -221,10 +237,11 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 - [x] **Foundation** — monorepo, shared domain package, shared component library
 - [x] **All five implementations** — idiomatic per each library's own docs
 - [x] **Functional parity** — 51 e2e tests, including exact cross-app equality of derived state
-- [x] **Benchmark harness** — CPU, interaction latency, frame pacing, TBT, render granularity, at two CPU conditions, with confidence intervals and significance tests
+- [x] **Benchmark harness** — CPU, interaction latency, frame pacing, TBT, render granularity, at two CPU conditions, with bootstrap intervals, exact rank tests and a family-wise correction
 - [x] **Reproducible complexity metrics** — `npm run metrics`, CI-enforced
 - [x] **Change-cost experiment** — same feature added to all five from a frozen tag, diff measured
 - [ ] **Concurrency safety** — run dai-shi's tearing suite against all five
+- [ ] **Explain the CPU-throttling anomaly** — the 4× condition reports less scripting time for provably identical work
 - [ ] **Live demo** on GitHub Pages with an implementation switcher
 
 ---

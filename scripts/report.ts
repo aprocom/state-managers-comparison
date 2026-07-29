@@ -9,8 +9,9 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
-  holmAdjust, rank, renderMarkdownTable, rendersPerQuoteCeiling,
+  rank, renderMarkdownTable, rendersPerQuoteCeiling,
 } from '../packages/bench/src/results.ts';
+import { holmAdjust } from '../packages/bench/src/stats.ts';
 import type { BenchmarkReport, MetricKey } from '../packages/bench/src/results.ts';
 
 interface RawReport extends BenchmarkReport {
@@ -171,7 +172,15 @@ for (const [index, cell] of cells.entries()) {
       '',
       cell.cpuThrottle === 1
         ? 'An unthrottled desktop — where almost every published comparison stops.'
-        : 'Approximately a mid-range phone.',
+        : 'Nominally a mid-range phone. **Do not compare these absolute numbers with the 1×'
+          + ' section.** Both conditions provably do the same work — the same quotes'
+          + ' delivered, the same row renders, the same 60 FPS — and yet CDP reports'
+          + ' roughly half the scripting time under throttling. Throttling cannot make the'
+          + ' same work cost less, so something about how these counters are collected'
+          + ' under `Emulation.setCPUThrottlingRate` is wrong, and this project has not'
+          + ' worked out what. The ordering within this section is measured the same way'
+          + ' for all five and is comparable; the levels are not comparable across'
+          + ' sections.',
       '',
     );
   }

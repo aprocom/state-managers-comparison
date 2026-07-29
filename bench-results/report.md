@@ -1,16 +1,18 @@
 # Benchmark results
 
-Generated from `bench-results/latest.json`: 5 repeats per cell, 5-second soaks, 30 samples per implementation, runs interleaved across implementations.
+Generated from `bench-results/latest.json`: 10 repeats per cell, 5-second soaks, 60 samples per implementation (10 per cell), runs interleaved across implementations, rates and CPU conditions.
 
-Every median carries a seeded bootstrap 95% confidence interval. The p-value is a
-two-sided Mann-Whitney U test against the best implementation on that metric, and
-the effect column is Cliff's delta bucketed by the Romano thresholds. A row marked
-**not significant** means the ordering above it did not survive the noise and should
-not be read as a ranking.
+Commit `a84ad60` · Apple M4 (10 threads) · 24 GB · darwin arm64 · node v22.15.0
 
-Commit `b79239f` · Apple M4 (10 threads) · 24 GB · darwin arm64 · node v22.15.0
+## How to read these tables
 
+Each median carries a seeded bootstrap 95% confidence interval.
 
+Each implementation is compared against the best one on that metric with a two-sided Mann-Whitney U test — exact where the samples are untied, which they usually are, and the normal approximation with a tie correction otherwise.
+
+**The p-values are Holm-adjusted across all 144 comparisons this report makes.** Running this many tests at α = 0.05 and printing the raw values would be expected to produce several false positives and present them as findings. Holm controls the family-wise error rate without assuming the tests are independent, which they are not — the same samples appear in more than one comparison. 9 of 144 comparisons survive the correction.
+
+The effect column is Cliff's delta bucketed by the Romano thresholds. A row marked **not significant** did not survive; it should not be read as a ranking, and it is not evidence of equality either — with this many samples per cell, only a large difference can be detected at all.
 
 ## CPU throttling 1×
 
@@ -18,389 +20,449 @@ An unthrottled desktop — where almost every published comparison stops.
 
 ### 10 updates/sec
 
-**Main-thread CPU** — ms of scripting per second of wall clock.
+**Main-thread CPU**
 
-| | scriptMsPerSecond (ms/s), median [95% CI] | vs. best (p) | effect |
+Milliseconds of scripting per second of wall clock.
+
+| | scriptMsPerSecond (ms/s), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 9.5 [7.8–10.3] | — | best |
-| **rxjs** | 10.1 [8.5–10.1] | 1.000 | not significant |
-| **jotai** | 10.1 [8.7–10.5] | 0.676 | not significant |
-| **redux** | 11.1 [9.5–13.2] | 0.037 | large |
-| **zustand** | 11.8 [10.4–12.9] | 0.012 | large |
+| **rxjs** | 9.5 [8.5–9.8] | — | best |
+| **mobx** | 10.0 [9.3–10.1] | 1.0000 | not significant |
+| **jotai** | 11.0 [10.8–11.2] | 0.0979 | not significant |
+| **zustand** | 11.1 [9.9–11.3] | 1.0000 | not significant |
+| **redux** | 12.2 [11.9–12.3] | 0.0979 | not significant |
 
-**Interaction latency** — worst Event Timing duration for a click made while
-the feed was running. This is the primitive INP is computed from.
+**Interaction latency**
 
-| | interactionWorstMs (ms), median [95% CI] | vs. best (p) | effect |
+Worst Event Timing duration for a click made while the feed was running — the primitive INP is computed from. Quantised to 8 ms by the spec.
+
+| | interactionWorstMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 16 [16–16] | — | best |
-| **rxjs** | 16 [16–16] | 1.000 | not significant |
-| **mobx** | 16 [16–24] | 0.177 | not significant |
-| **jotai** | 16 [16–16] | 1.000 | not significant |
-| **redux** | 16 [16–24] | 0.424 | not significant |
+| **rxjs** | 16 [16–16] | 1.0000 | not significant |
+| **mobx** | 16 [16–24] | 1.0000 | not significant |
+| **jotai** | 16 [16–16] | 1.0000 | not significant |
+| **redux** | 16 [16–24] | 1.0000 | not significant |
 
-**Frame pacing** — p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz.
+**Frame pacing**
 
-| | frameP99Ms (ms), median [95% CI] | vs. best (p) | effect |
+p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz and is also the floor.
+
+| | frameP99Ms (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 17.6 [17.6–18.6] | — | best |
-| **zustand** | 17.7 [17.6–18.7] | 0.449 | not significant |
-| **rxjs** | 17.7 [17.6–18.6] | 0.746 | not significant |
-| **redux** | 17.7 [17.6–18.6] | 0.914 | not significant |
-| **jotai** | 17.7 [17.7–18.6] | 0.599 | not significant |
+| **rxjs** | 18.5 [18.4–18.6] | — | best |
+| **jotai** | 18.5 [18.5–18.6] | 1.0000 | not significant |
+| **mobx** | 18.5 [18.5–18.6] | 1.0000 | not significant |
+| **redux** | 18.5 [18.5–18.6] | 1.0000 | not significant |
+| **zustand** | 18.6 [18.5–18.6] | 1.0000 | not significant |
 
-**Instrument row renders per quote** — optimal is 1.00; the metric's ceiling at this rate is 50.00, so a fully unmemoised implementation would be visible.
+**Total Blocking Time**
 
-| | rendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
+Milliseconds beyond the 50 ms long-task threshold. 0 means no task ever reached 50 ms, not that the implementations are equal.
 
-**Position row renders per quote that touched a held instrument** — the metric
-that caught MobX and Jotai deriving all six rows from one coarse computation.
-
-| | positionRendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
-
-**Total Blocking Time** — ms beyond the 50 ms long-task threshold.
-
-| | totalBlockingMs (ms), median [95% CI] | vs. best (p) | effect |
+| | totalBlockingMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 0 [0–0] | — | best |
-| **rxjs** | 0 [0–0] | 1.000 | not significant |
-| **mobx** | 0 [0–0] | 1.000 | not significant |
-| **jotai** | 0 [0–0] | 1.000 | not significant |
-| **redux** | 0 [0–0] | 1.000 | not significant |
+| **rxjs** | 0 [0–0] | 1.0000 | not significant |
+| **mobx** | 0 [0–0] | 1.0000 | not significant |
+| **jotai** | 0 [0–0] | 1.0000 | not significant |
+| **redux** | 0 [0–0] | 1.0000 | not significant |
+
+**Instrument row renders per quote**
+
+Optimal is 1.00. The metric's ceiling at this rate is 50.00, so a fully unmemoised implementation would be plainly visible.
+
+| | rendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+
+**Position row renders per quote on a held instrument**
+
+Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+| | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
 
 ### 100 updates/sec
 
-**Main-thread CPU** — ms of scripting per second of wall clock.
+**Main-thread CPU**
 
-| | scriptMsPerSecond (ms/s), median [95% CI] | vs. best (p) | effect |
+Milliseconds of scripting per second of wall clock.
+
+| | scriptMsPerSecond (ms/s), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 16.3 [12.6–18.9] | — | best |
-| **rxjs** | 20.4 [15.4–21.2] | 0.144 | not significant |
-| **jotai** | 23.0 [18.0–26.9] | 0.037 | large |
-| **zustand** | 23.1 [20.3–29.3] | 0.012 | large |
-| **redux** | 29.6 [25.9–32.8] | 0.012 | large |
+| **rxjs** | 18.3 [18.0–18.7] | — | best |
+| **mobx** | 19.1 [18.5–19.5] | 1.0000 | not significant |
+| **zustand** | 24.7 [24.1–25.2] | 0.1397 | not significant |
+| **jotai** | 27.5 [25.4–29.8] | 0.0059 | large |
+| **redux** | 28.2 [26.8–29.2] | 0.0016 | large |
 
-**Interaction latency** — worst Event Timing duration for a click made while
-the feed was running. This is the primitive INP is computed from.
+**Interaction latency**
 
-| | interactionWorstMs (ms), median [95% CI] | vs. best (p) | effect |
+Worst Event Timing duration for a click made while the feed was running — the primitive INP is computed from. Quantised to 8 ms by the spec.
+
+| | interactionWorstMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **zustand** | 16 [16–16] | — | best |
-| **rxjs** | 16 [16–16] | 1.000 | not significant |
-| **mobx** | 16 [16–24] | 0.177 | not significant |
-| **jotai** | 16 [16–24] | 0.424 | not significant |
-| **redux** | 16 [16–16] | 1.000 | not significant |
+| **zustand** | 16 [16–24] | — | best |
+| **rxjs** | 16 [16–16] | 1.0000 | not significant |
+| **mobx** | 16 [16–24] | 1.0000 | not significant |
+| **jotai** | 16 [16–20] | 1.0000 | not significant |
+| **redux** | 16 [16–16] | 1.0000 | not significant |
 
-**Frame pacing** — p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz.
+**Frame pacing**
 
-| | frameP99Ms (ms), median [95% CI] | vs. best (p) | effect |
+p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz and is also the floor.
+
+| | frameP99Ms (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **redux** | 17.6 [17.6–18.6] | — | best |
-| **zustand** | 17.6 [17.6–18.5] | 0.829 | not significant |
-| **rxjs** | 17.7 [17.6–18.6] | 0.112 | not significant |
-| **mobx** | 17.7 [17.5–18.6] | 0.527 | not significant |
-| **jotai** | 17.7 [17.6–18.7] | 0.089 | not significant |
+| **redux** | 18.5 [18.5–18.5] | — | best |
+| **zustand** | 18.5 [18.5–18.6] | 1.0000 | not significant |
+| **jotai** | 18.6 [18.5–18.6] | 1.0000 | not significant |
+| **rxjs** | 18.6 [18.5–18.6] | 1.0000 | not significant |
+| **mobx** | 18.6 [18.5–18.6] | 1.0000 | not significant |
 
-**Instrument row renders per quote** — optimal is 1.00; the metric's ceiling at this rate is 10.00, so a fully unmemoised implementation would be visible.
+**Total Blocking Time**
 
-| | rendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [0.99–1.01] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
+Milliseconds beyond the 50 ms long-task threshold. 0 means no task ever reached 50 ms, not that the implementations are equal.
 
-**Position row renders per quote that touched a held instrument** — the metric
-that caught MobX and Jotai deriving all six rows from one coarse computation.
-
-| | positionRendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **rxjs** | 1.00 [1.00–1.00] | — | best |
-| **jotai** | 1.00 [0.99–1.08] | 0.607 | not significant |
-| **redux** | 1.00 [1.00–1.07] | 0.177 | not significant |
-| **zustand** | 1.07 [1.00–1.07] | 0.020 | large |
-| **mobx** | 1.07 [1.00–1.07] | 0.067 | not significant |
-
-**Total Blocking Time** — ms beyond the 50 ms long-task threshold.
-
-| | totalBlockingMs (ms), median [95% CI] | vs. best (p) | effect |
+| | totalBlockingMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 0 [0–0] | — | best |
-| **rxjs** | 0 [0–0] | 1.000 | not significant |
-| **mobx** | 0 [0–0] | 1.000 | not significant |
-| **jotai** | 0 [0–0] | 1.000 | not significant |
-| **redux** | 0 [0–0] | 1.000 | not significant |
+| **rxjs** | 0 [0–0] | 1.0000 | not significant |
+| **mobx** | 0 [0–0] | 1.0000 | not significant |
+| **jotai** | 0 [0–0] | 1.0000 | not significant |
+| **redux** | 0 [0–0] | 1.0000 | not significant |
+
+**Instrument row renders per quote**
+
+Optimal is 1.00. The metric's ceiling at this rate is 10.00, so a fully unmemoised implementation would be plainly visible.
+
+| | rendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+
+**Position row renders per quote on a held instrument**
+
+Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+| | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
 
 ### 1000 updates/sec
 
-**Main-thread CPU** — ms of scripting per second of wall clock.
+**Main-thread CPU**
 
-| | scriptMsPerSecond (ms/s), median [95% CI] | vs. best (p) | effect |
+Milliseconds of scripting per second of wall clock.
+
+| | scriptMsPerSecond (ms/s), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 31.2 [24.5–37.6] | — | best |
-| **rxjs** | 67.0 [56.7–72.5] | 0.012 | large |
-| **jotai** | 75.1 [50.9–88.7] | 0.012 | large |
-| **zustand** | 88.4 [78.4–94.5] | 0.012 | large |
-| **redux** | 96.7 [61.3–107.2] | 0.012 | large |
+| **mobx** | 37.2 [35.6–37.7] | — | best |
+| **rxjs** | 44.8 [42.9–46.3] | 0.0016 | large |
+| **zustand** | 74.4 [73.3–76.9] | 0.0016 | large |
+| **jotai** | 87.5 [85.3–89.7] | 0.0016 | large |
+| **redux** | 89.2 [81.0–90.4] | 0.0016 | large |
 
-**Interaction latency** — worst Event Timing duration for a click made while
-the feed was running. This is the primitive INP is computed from.
+**Interaction latency**
 
-| | interactionWorstMs (ms), median [95% CI] | vs. best (p) | effect |
+Worst Event Timing duration for a click made while the feed was running — the primitive INP is computed from. Quantised to 8 ms by the spec.
+
+| | interactionWorstMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 16 [16–16] | — | best |
-| **rxjs** | 16 [16–16] | 1.000 | not significant |
-| **mobx** | 16 [16–16] | 1.000 | not significant |
-| **jotai** | 16 [16–24] | 0.424 | not significant |
-| **redux** | 16 [16–16] | 1.000 | not significant |
+| **rxjs** | 16 [16–16] | 1.0000 | not significant |
+| **mobx** | 16 [16–16] | 1.0000 | not significant |
+| **jotai** | 16 [16–16] | 1.0000 | not significant |
+| **redux** | 16 [16–16] | 1.0000 | not significant |
 
-**Frame pacing** — p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz.
+**Frame pacing**
 
-| | frameP99Ms (ms), median [95% CI] | vs. best (p) | effect |
+p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz and is also the floor.
+
+| | frameP99Ms (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **zustand** | 17.6 [17.6–18.6] | — | best |
-| **jotai** | 17.6 [17.6–18.6] | 0.752 | not significant |
-| **redux** | 17.6 [17.6–18.6] | 0.338 | not significant |
-| **rxjs** | 17.7 [17.6–18.6] | 0.337 | not significant |
-| **mobx** | 17.7 [17.6–18.6] | 0.669 | not significant |
+| **zustand** | 18.5 [18.1–18.6] | — | best |
+| **mobx** | 18.5 [18.1–18.6] | 1.0000 | not significant |
+| **jotai** | 18.5 [18.1–18.6] | 1.0000 | not significant |
+| **rxjs** | 18.5 [18.1–18.6] | 1.0000 | not significant |
+| **redux** | 18.5 [18.1–18.6] | 1.0000 | not significant |
 
-**Instrument row renders per quote** — optimal is 1.00; the metric's ceiling at this rate is 1.00, which is also the optimum, so this metric distinguishes nothing here.
+**Total Blocking Time**
 
-| | rendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.01] | 0.424 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
+Milliseconds beyond the 50 ms long-task threshold. 0 means no task ever reached 50 ms, not that the implementations are equal.
 
-**Position row renders per quote that touched a held instrument** — the metric
-that caught MobX and Jotai deriving all six rows from one coarse computation.
-
-| | positionRendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.01] | 0.424 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
-
-**Total Blocking Time** — ms beyond the 50 ms long-task threshold.
-
-| | totalBlockingMs (ms), median [95% CI] | vs. best (p) | effect |
+| | totalBlockingMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 0 [0–0] | — | best |
-| **rxjs** | 0 [0–0] | 1.000 | not significant |
-| **mobx** | 0 [0–0] | 1.000 | not significant |
-| **jotai** | 0 [0–0] | 1.000 | not significant |
-| **redux** | 0 [0–0] | 1.000 | not significant |
+| **rxjs** | 0 [0–0] | 1.0000 | not significant |
+| **mobx** | 0 [0–0] | 1.0000 | not significant |
+| **jotai** | 0 [0–0] | 1.0000 | not significant |
+| **redux** | 0 [0–0] | 1.0000 | not significant |
+
+**Instrument row renders per quote**
+
+Optimal is 1.00. The metric's ceiling at this rate is 1.00 — which is also the optimum, so this metric distinguishes nothing here and is printed only to show that it cannot.
+
+| | rendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+
+**Position row renders per quote on a held instrument**
+
+Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+| | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
 
 ## CPU throttling 4×
 
-Approximately a mid-range phone.
+Nominally a mid-range phone. **Do not compare these absolute numbers with the 1× section.** Both conditions provably do the same work — the same quotes delivered, the same row renders, the same 60 FPS — and yet CDP reports roughly half the scripting time under throttling. Throttling cannot make the same work cost less, so something about how these counters are collected under `Emulation.setCPUThrottlingRate` is wrong, and this project has not worked out what. The ordering within this section is measured the same way for all five and is comparable; the levels are not comparable across sections.
 
 ### 10 updates/sec
 
-**Main-thread CPU** — ms of scripting per second of wall clock.
+**Main-thread CPU**
 
-| | scriptMsPerSecond (ms/s), median [95% CI] | vs. best (p) | effect |
+Milliseconds of scripting per second of wall clock.
+
+| | scriptMsPerSecond (ms/s), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 3.8 [3.2–6.9] | — | best |
-| **rxjs** | 4.0 [3.4–7.3] | 0.296 | not significant |
-| **jotai** | 5.7 [3.7–8.3] | 0.403 | not significant |
-| **redux** | 6.5 [5.1–10.2] | 0.095 | not significant |
-| **zustand** | 7.1 [5.8–9.9] | 0.037 | large |
+| **mobx** | 2.1 [1.8–2.7] | — | best |
+| **rxjs** | 2.2 [1.7–2.3] | 1.0000 | not significant |
+| **jotai** | 2.5 [2.3–2.6] | 1.0000 | not significant |
+| **zustand** | 2.8 [2.4–3.1] | 1.0000 | not significant |
+| **redux** | 3.1 [2.6–3.2] | 0.6807 | not significant |
 
-**Interaction latency** — worst Event Timing duration for a click made while
-the feed was running. This is the primitive INP is computed from.
+**Interaction latency**
 
-| | interactionWorstMs (ms), median [95% CI] | vs. best (p) | effect |
+Worst Event Timing duration for a click made while the feed was running — the primitive INP is computed from. Quantised to 8 ms by the spec.
+
+| | interactionWorstMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 16 [16–16] | — | best |
-| **rxjs** | 16 [16–16] | 1.000 | not significant |
-| **mobx** | 16 [16–16] | 1.000 | not significant |
-| **jotai** | 16 [16–16] | 1.000 | not significant |
-| **redux** | 16 [16–16] | 1.000 | not significant |
+| **rxjs** | 16 [16–16] | 1.0000 | not significant |
+| **mobx** | 16 [16–16] | 1.0000 | not significant |
+| **jotai** | 16 [16–16] | 1.0000 | not significant |
+| **redux** | 16 [16–16] | 1.0000 | not significant |
 
-**Frame pacing** — p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz.
+**Frame pacing**
 
-| | frameP99Ms (ms), median [95% CI] | vs. best (p) | effect |
+p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz and is also the floor.
+
+| | frameP99Ms (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **zustand** | 17.7 [17.6–18.7] | — | best |
-| **mobx** | 17.7 [17.6–18.7] | 0.670 | not significant |
-| **rxjs** | 17.7 [17.7–18.6] | 0.398 | not significant |
-| **jotai** | 17.7 [17.6–18.7] | 0.595 | not significant |
-| **redux** | 17.7 [17.7–18.7] | 0.114 | not significant |
+| **jotai** | 18.6 [18.6–18.7] | — | best |
+| **zustand** | 18.7 [18.6–18.7] | 1.0000 | not significant |
+| **rxjs** | 18.7 [18.6–18.7] | 1.0000 | not significant |
+| **mobx** | 18.7 [18.6–18.7] | 1.0000 | not significant |
+| **redux** | 18.7 [18.6–18.7] | 1.0000 | not significant |
 
-**Instrument row renders per quote** — optimal is 1.00; the metric's ceiling at this rate is 50.00, so a fully unmemoised implementation would be visible.
+**Total Blocking Time**
 
-| | rendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
+Milliseconds beyond the 50 ms long-task threshold. 0 means no task ever reached 50 ms, not that the implementations are equal.
 
-**Position row renders per quote that touched a held instrument** — the metric
-that caught MobX and Jotai deriving all six rows from one coarse computation.
-
-| | positionRendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
-
-**Total Blocking Time** — ms beyond the 50 ms long-task threshold.
-
-| | totalBlockingMs (ms), median [95% CI] | vs. best (p) | effect |
+| | totalBlockingMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 0 [0–0] | — | best |
-| **rxjs** | 0 [0–0] | 1.000 | not significant |
-| **mobx** | 0 [0–0] | 1.000 | not significant |
-| **jotai** | 0 [0–0] | 1.000 | not significant |
-| **redux** | 0 [0–0] | 1.000 | not significant |
+| **rxjs** | 0 [0–0] | 1.0000 | not significant |
+| **mobx** | 0 [0–0] | 1.0000 | not significant |
+| **jotai** | 0 [0–0] | 1.0000 | not significant |
+| **redux** | 0 [0–0] | 1.0000 | not significant |
+
+**Instrument row renders per quote**
+
+Optimal is 1.00. The metric's ceiling at this rate is 50.00, so a fully unmemoised implementation would be plainly visible.
+
+| | rendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+
+**Position row renders per quote on a held instrument**
+
+Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+| | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
 
 ### 100 updates/sec
 
-**Main-thread CPU** — ms of scripting per second of wall clock.
+**Main-thread CPU**
 
-| | scriptMsPerSecond (ms/s), median [95% CI] | vs. best (p) | effect |
+Milliseconds of scripting per second of wall clock.
+
+| | scriptMsPerSecond (ms/s), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 5.9 [4.2–17.0] | — | best |
-| **rxjs** | 8.6 [6.8–20.1] | 0.210 | not significant |
-| **jotai** | 13.8 [11.1–22.4] | 0.144 | not significant |
-| **redux** | 14.8 [13.6–24.0] | 0.095 | not significant |
-| **zustand** | 15.2 [12.0–22.5] | 0.144 | not significant |
+| **rxjs** | 3.1 [2.8–5.1] | — | best |
+| **mobx** | 4.0 [3.2–5.9] | 1.0000 | not significant |
+| **redux** | 6.1 [5.8–7.3] | 0.8894 | not significant |
+| **zustand** | 6.2 [5.8–7.6] | 0.8894 | not significant |
+| **jotai** | 7.7 [7.4–8.5] | 0.1986 | not significant |
 
-**Interaction latency** — worst Event Timing duration for a click made while
-the feed was running. This is the primitive INP is computed from.
+**Interaction latency**
 
-| | interactionWorstMs (ms), median [95% CI] | vs. best (p) | effect |
+Worst Event Timing duration for a click made while the feed was running — the primitive INP is computed from. Quantised to 8 ms by the spec.
+
+| | interactionWorstMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 16 [16–16] | — | best |
-| **rxjs** | 16 [16–16] | 1.000 | not significant |
-| **mobx** | 16 [16–16] | 1.000 | not significant |
-| **jotai** | 16 [16–16] | 1.000 | not significant |
-| **redux** | 16 [16–16] | 1.000 | not significant |
+| **rxjs** | 16 [16–16] | 1.0000 | not significant |
+| **mobx** | 16 [16–16] | 1.0000 | not significant |
+| **jotai** | 16 [16–16] | 1.0000 | not significant |
+| **redux** | 16 [16–16] | 1.0000 | not significant |
 
-**Frame pacing** — p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz.
+**Frame pacing**
 
-| | frameP99Ms (ms), median [95% CI] | vs. best (p) | effect |
+p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz and is also the floor.
+
+| | frameP99Ms (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **zustand** | 17.7 [17.6–18.7] | — | best |
-| **jotai** | 17.7 [17.6–18.7] | 0.515 | not significant |
-| **redux** | 17.7 [17.6–18.6] | 0.914 | not significant |
-| **rxjs** | 17.7 [17.7–18.7] | 0.290 | not significant |
-| **mobx** | 17.7 [17.7–18.6] | 0.589 | not significant |
+| **rxjs** | 18.6 [18.2–18.7] | — | best |
+| **jotai** | 18.6 [18.2–18.7] | 1.0000 | not significant |
+| **zustand** | 18.7 [18.6–18.7] | 1.0000 | not significant |
+| **redux** | 18.7 [18.2–18.7] | 1.0000 | not significant |
+| **mobx** | 18.7 [18.2–18.7] | 1.0000 | not significant |
 
-**Instrument row renders per quote** — optimal is 1.00; the metric's ceiling at this rate is 10.00, so a fully unmemoised implementation would be visible.
+**Total Blocking Time**
 
-| | rendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
+Milliseconds beyond the 50 ms long-task threshold. 0 means no task ever reached 50 ms, not that the implementations are equal.
 
-**Position row renders per quote that touched a held instrument** — the metric
-that caught MobX and Jotai deriving all six rows from one coarse computation.
-
-| | positionRendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.07] | — | best |
-| **rxjs** | 1.00 [1.00–1.07] | 0.600 | not significant |
-| **mobx** | 1.00 [1.00–1.07] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.07] | 0.600 | not significant |
-| **jotai** | 1.07 [1.00–1.07] | 0.270 | not significant |
-
-**Total Blocking Time** — ms beyond the 50 ms long-task threshold.
-
-| | totalBlockingMs (ms), median [95% CI] | vs. best (p) | effect |
+| | totalBlockingMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 0 [0–0] | — | best |
-| **rxjs** | 0 [0–0] | 1.000 | not significant |
-| **mobx** | 0 [0–0] | 1.000 | not significant |
-| **jotai** | 0 [0–0] | 1.000 | not significant |
-| **redux** | 0 [0–0] | 1.000 | not significant |
+| **rxjs** | 0 [0–0] | 1.0000 | not significant |
+| **mobx** | 0 [0–0] | 1.0000 | not significant |
+| **jotai** | 0 [0–0] | 1.0000 | not significant |
+| **redux** | 0 [0–0] | 1.0000 | not significant |
+
+**Instrument row renders per quote**
+
+Optimal is 1.00. The metric's ceiling at this rate is 10.00, so a fully unmemoised implementation would be plainly visible.
+
+| | rendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+
+**Position row renders per quote on a held instrument**
+
+Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+| | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
 
 ### 1000 updates/sec
 
-**Main-thread CPU** — ms of scripting per second of wall clock.
+**Main-thread CPU**
 
-| | scriptMsPerSecond (ms/s), median [95% CI] | vs. best (p) | effect |
+Milliseconds of scripting per second of wall clock.
+
+| | scriptMsPerSecond (ms/s), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **mobx** | 18.4 [14.5–23.1] | — | best |
-| **rxjs** | 61.5 [60.6–66.2] | 0.012 | large |
-| **jotai** | 76.4 [72.4–78.8] | 0.012 | large |
-| **zustand** | 89.5 [84.1–94.4] | 0.012 | large |
-| **redux** | 102.0 [100.1–115.0] | 0.012 | large |
+| **mobx** | 11.6 [11.0–21.5] | — | best |
+| **rxjs** | 21.4 [20.8–29.5] | 1.0000 | not significant |
+| **zustand** | 44.9 [44.5–56.3] | 0.0016 | large |
+| **redux** | 60.8 [59.6–71.9] | 0.0016 | large |
+| **jotai** | 63.9 [63.1–77.5] | 0.0016 | large |
 
-**Interaction latency** — worst Event Timing duration for a click made while
-the feed was running. This is the primitive INP is computed from.
+**Interaction latency**
 
-| | interactionWorstMs (ms), median [95% CI] | vs. best (p) | effect |
+Worst Event Timing duration for a click made while the feed was running — the primitive INP is computed from. Quantised to 8 ms by the spec.
+
+| | interactionWorstMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 16 [16–16] | — | best |
-| **rxjs** | 16 [16–16] | 1.000 | not significant |
-| **mobx** | 16 [16–16] | 1.000 | not significant |
-| **jotai** | 16 [16–16] | 1.000 | not significant |
-| **redux** | 16 [16–16] | 1.000 | not significant |
+| **rxjs** | 16 [16–16] | 1.0000 | not significant |
+| **mobx** | 16 [16–16] | 1.0000 | not significant |
+| **jotai** | 16 [16–16] | 1.0000 | not significant |
+| **redux** | 16 [16–16] | 1.0000 | not significant |
 
-**Frame pacing** — p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz.
+**Frame pacing**
 
-| | frameP99Ms (ms), median [95% CI] | vs. best (p) | effect |
+p99 of the inter-frame interval. 16.7 ms is a clean 60 Hz and is also the floor.
+
+| | frameP99Ms (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
-| **zustand** | 17.7 [17.6–18.7] | — | best |
-| **redux** | 17.7 [17.7–18.7] | 0.737 | not significant |
-| **rxjs** | 17.7 [17.7–18.7] | 0.449 | not significant |
-| **mobx** | 17.7 [17.7–18.6] | 0.518 | not significant |
-| **jotai** | 17.7 [17.6–18.7] | 0.830 | not significant |
+| **mobx** | 18.6 [18.1–18.7] | — | best |
+| **redux** | 18.6 [18.2–18.7] | 1.0000 | not significant |
+| **zustand** | 18.7 [18.2–18.7] | 1.0000 | not significant |
+| **rxjs** | 18.7 [18.2–18.7] | 1.0000 | not significant |
+| **jotai** | 18.7 [18.2–18.7] | 1.0000 | not significant |
 
-**Instrument row renders per quote** — optimal is 1.00; the metric's ceiling at this rate is 1.00, which is also the optimum, so this metric distinguishes nothing here.
+**Total Blocking Time**
 
-| | rendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [0.99–1.01] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
+Milliseconds beyond the 50 ms long-task threshold. 0 means no task ever reached 50 ms, not that the implementations are equal.
 
-**Position row renders per quote that touched a held instrument** — the metric
-that caught MobX and Jotai deriving all six rows from one coarse computation.
-
-| | positionRendersPerQuote, median [95% CI] | vs. best (p) | effect |
-|---|---:|---:|---|
-| **zustand** | 1.00 [1.00–1.00] | — | best |
-| **rxjs** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **mobx** | 1.00 [1.00–1.00] | 1.000 | not significant |
-| **jotai** | 1.00 [0.99–1.01] | 1.000 | not significant |
-| **redux** | 1.00 [1.00–1.00] | 1.000 | not significant |
-
-**Total Blocking Time** — ms beyond the 50 ms long-task threshold.
-
-| | totalBlockingMs (ms), median [95% CI] | vs. best (p) | effect |
+| | totalBlockingMs (ms), median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 0 [0–0] | — | best |
-| **rxjs** | 0 [0–0] | 1.000 | not significant |
-| **mobx** | 0 [0–0] | 1.000 | not significant |
-| **jotai** | 0 [0–0] | 1.000 | not significant |
-| **redux** | 0 [0–0] | 1.000 | not significant |
+| **rxjs** | 0 [0–0] | 1.0000 | not significant |
+| **mobx** | 0 [0–0] | 1.0000 | not significant |
+| **jotai** | 0 [0–0] | 1.0000 | not significant |
+| **redux** | 0 [0–0] | 1.0000 | not significant |
+
+**Instrument row renders per quote**
+
+Optimal is 1.00. The metric's ceiling at this rate is 1.00 — which is also the optimum, so this metric distinguishes nothing here and is printed only to show that it cannot.
+
+| | rendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+
+**Position row renders per quote on a held instrument**
+
+Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+| | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
+|---|---:|---:|---|
+| **zustand** | 1.00 [1.00–1.00] | — | best |
+| **rxjs** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **mobx** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **jotai** | 1.00 [1.00–1.00] | 1.0000 | not significant |
+| **redux** | 1.00 [1.00–1.00] | 1.0000 | not significant |
 
