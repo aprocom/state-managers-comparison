@@ -13,4 +13,5 @@ export const APP_TARGETS: AppTarget[] = [
   { name: 'zustand', workspace: '@smc/app-zustand', port: 4173 },
   { name: 'rxjs', workspace: '@smc/app-rxjs', port: 4174 },
   { name: 'mobx', workspace: '@smc/app-mobx', port: 4175 },
+  { name: 'jotai', workspace: '@smc/app-jotai', port: 4176 },
 ];
