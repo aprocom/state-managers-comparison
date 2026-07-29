@@ -126,6 +126,10 @@ npm test
 npm run test:e2e
 ```
 
+```bash
+npm run bench
+```
+
 The parity suite is the acceptance gate: every implementation must pass the same eight functional tests, driven through a shared set of `data-testid` values, before its performance is measured at all. Benchmarking apps that behave differently would be meaningless.
 
 ## Licence

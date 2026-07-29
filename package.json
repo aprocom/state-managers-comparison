@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/bench && tsc --noEmit -p apps/zustand && tsc --noEmit -p apps/rxjs && tsc --noEmit -p apps/mobx && tsc --noEmit -p apps/jotai && tsc --noEmit -p apps/redux",
     "build:apps": "npm run build --workspaces --if-present",
-    "test:e2e": "npm run build:apps && playwright test"
+    "test:e2e": "npm run build:apps && playwright test e2e/parity.spec.ts",
+    "bench": "npm run build:apps && playwright test e2e/benchmark.spec.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.0",
