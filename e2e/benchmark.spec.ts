@@ -120,14 +120,24 @@ async function measure(
 
   // Zero the counters and take t0 inside the page, so the measured window is
   // the one the page saw rather than the one bracketing two CDP round-trips.
-  await page.evaluate(() => {
+  //
+  // Zeroed twice, with two frames in between. A batch emitted just before the
+  // reset commits just after it, so its row renders land in the window with no
+  // quotes to divide by — which is how three published samples read 1.01
+  // renders per quote against a ceiling of exactly 1.00.
+  await page.evaluate(async () => {
     const w = window as unknown as Instrumentation;
-    w.__SMC_RENDERS__ = { instrumentRow: 0, positionRow: 0, journalRow: 0 };
-    w.__SMC_QUOTES__ = 0;
-    w.__SMC_QUOTES_BY_INSTRUMENT__ = {};
-    w.__SMC_FRAME_TIMES__ = [];
-    w.__SMC_LONG_TASKS__ = { count: 0, totalMs: 0, blockingMs: 0 };
-    w.__SMC_INTERACTIONS__ = [];
+    const zero = () => {
+      w.__SMC_RENDERS__ = { instrumentRow: 0, positionRow: 0, journalRow: 0 };
+      w.__SMC_QUOTES__ = 0;
+      w.__SMC_QUOTES_BY_INSTRUMENT__ = {};
+      w.__SMC_FRAME_TIMES__ = [];
+      w.__SMC_LONG_TASKS__ = { count: 0, totalMs: 0, blockingMs: 0 };
+      w.__SMC_INTERACTIONS__ = [];
+    };
+    zero();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    zero();
     w.__SMC_T0__ = performance.now();
   });
   const before = await readMetrics();
@@ -233,8 +243,15 @@ test('benchmark — all implementations, interleaved', async ({ page }) => {
       // exact bias interleaving the implementations was meant to remove, one
       // level up. Found by noticing that MobX measured *cheaper* under 4x
       // throttling than without it, which is not a thing throttling can do.
-      for (const cpuThrottle of CPU_THROTTLES) {
-        for (const target of APP_TARGETS) {
+      for (const target of APP_TARGETS) {
+        // Throttle innermost. With it one level out, all five 1x samples ran
+        // and then all five 4x samples a minute later, so any drift in machine
+        // state mapped systematically onto the throttle condition — the same
+        // bias interleaving the implementations removes, one level up again.
+        // It produced a step change visible in the committed samples: every
+        // app's 4x/1x ratio jumped in the same repeat, in the same direction,
+        // at every rate, which no property of an app can explain.
+        for (const cpuThrottle of CPU_THROTTLES) {
           samplesByApp.get(target.name)!.push(
             await measure(page, cdp, target.port, rate, repeat, cpuThrottle),
           );

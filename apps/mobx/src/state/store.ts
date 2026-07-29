@@ -167,6 +167,7 @@ export class AppStore {
       instrumentRows: computed,
       pinnedCount: computed,
       positionRows: computed,
+      sortedTrades: computed,
       drawdown: computed,
       accountTotals: computed,
       filteredTrades: computed,
@@ -220,6 +221,12 @@ export class AppStore {
 
   get positionRows(): PositionRowModel[] {
     return this.positionModels.map((model) => model.row);
+  }
+
+  /** Newest-first, cached on the trades array — the ordering Redux's entity
+   *  adapter keeps in the store for free. */
+  get sortedTrades(): Trade[] {
+    return [...this.trades].sort((a, b) => b.closedAt - a.closedAt);
   }
 
   /** Depends only on closed trades, so it survives every price tick. */
@@ -291,7 +298,7 @@ export class AppStore {
       ),
       dailyLossLimit: DAILY_LOSS_LIMIT,
       riskLimitPerTrade: RISK_LIMIT_PER_TRADE,
-      recentClosedTrades: [...this.trades].sort((a, b) => b.closedAt - a.closedAt),
+      recentClosedTrades: this.sortedTrades,
       openPositions: this.positions.map((position) => ({
         position,
         holdingMs: now - position.openedAt,

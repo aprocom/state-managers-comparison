@@ -13,7 +13,7 @@ The same app is built five times. Everything except the state layer is shared: d
 ## The short version
 
 1. **On this workload, the state manager is not the bottleneck** — but that sentence has to be earned, not asserted, and the earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
-2. **What separates the five is main-thread CPU** — a 2.4× spread on identical work, MobX cheapest and Redux most expensive. Render counts, frame rate, interaction latency and blocking time separate nothing, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
+2. **What separates the five is main-thread CPU** — a 2.4× spread on work the cross-app suite proves identical, MobX cheapest and Redux most expensive. Render counts, frame rate, interaction latency and blocking time separate nothing, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
 3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work — more than every architectural difference between the five combined.
 4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
 
@@ -81,7 +81,7 @@ Stated in full, because in this genre the methodology *is* the contribution.
 | Total Blocking Time | Long-task *count* has a 50 ms dead zone this workload never approaches | 0 below 50 ms/task |
 | Row renders per quote | Detects broken memoisation | **see below** |
 
-**The row-render ceiling, which is the single most important caveat in this project.** React coalesces everything one feed batch does into a single commit. The feed emits 20 batches per second, so the worst any implementation can do is re-render all 50 rows once per batch. That makes the maximum readable value `50 × min(rate, 20) / rate` — **50** at 10 updates/sec, **10** at 100, and exactly **1.00** at 1000. At 1000 updates/sec an implementation that re-renders every row scores identically to one that re-renders only the row that changed. The metric is informative at the two lower rates and is pure decoration at the top one. `rendersPerQuoteCeiling()` computes this, it is unit-tested, and it is printed next to every table.
+**The row-render ceilings, which are the single most important caveat in this project.** React coalesces everything one feed batch does into a single commit. The feed emits 20 batches per second, so the worst any implementation can do is re-render all 50 rows once per batch. That makes the maximum readable value `50 × min(rate, 20) / rate` — **50** at 10 updates/sec, **10** at 100, and exactly **1.00** at 1000. At 1000 updates/sec an implementation that re-renders every row scores identically to one that re-renders only the row that changed. The metric is informative at the two lower rates and is pure decoration at the top one. `rendersPerQuoteCeiling()` computes this, it is unit-tested, and it is printed next to every table. The position table saturates the same way — six rows fed by the 6/50 of quotes that land on a held instrument gives a ceiling of 6.00 at the two lower rates and **1.00 at 1000**. That sibling ceiling went undisclosed for one round while this paragraph called the instrument one the most important caveat in the project; `positionRendersPerQuoteCeiling()` now computes it and the report prints it too.
 
 Everything is reproducible: `npm run bench` regenerates the raw samples, `npm run report` regenerates the tables from them, `npm run metrics` regenerates the complexity table from the source tree, and `npm run metrics -- --check` fails the build if the README's table has drifted from the code.
 
@@ -115,11 +115,11 @@ Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrott
 | **Jotai** | 87.5 [85.3–89.7] | 0.0016 | large |
 | **Redux Toolkit** | 89.2 [81.0–90.4] | 0.0016 | large |
 
-A 2.4× spread between the cheapest and the most expensive, on identical work, verified identical by the cross-app suite. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `a84ad60`, which is recorded in the results file; nothing under `apps/` or `packages/` has changed since, so the numbers describe the tree you are reading.
+A 2.4× spread between the cheapest and the most expensive, on output the cross-app suite verifies is identical. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `a84ad60`, which is recorded in the results file; nothing under `apps/` or `packages/` has changed since, so the numbers describe the tree you are reading.
 
 **Read this ranking knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. All five now do the same work per quote. But this is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
 
-**The 4× CPU-throttling condition does not behave.** Both conditions provably do the same work — the same quotes delivered, the same row renders, the same 60 FPS — and CDP reports roughly *half* the scripting time under throttling. Throttling cannot make identical work cost less, so the counters are not measuring what they claim under `Emulation.setCPUThrottlingRate`, and I have not worked out why. The absolute numbers from that section are not comparable with the unthrottled ones; the ordering within it is, because all five are measured the same way, and it agrees. It is published with that caveat rather than dropped.
+**The 4× throttling numbers in the current results file are contaminated, and the cause was my harness.** That section reported *less* scripting time than the unthrottled one for provably identical work. I published it as an unexplained CDP anomaly. It was not: the throttle level sat outside the per-implementation loop, so all five 1× samples ran and then all five 4× samples about a minute later, and any drift in machine state mapped systematically onto the condition — the same bias that interleaving the implementations was introduced to remove, one level up, twice. The step is visible in the committed samples: every app's 4×/1× ratio jumps at the same repeat, in the same direction, at every rate, which no property of an app can explain. A controlled check with the throttle applied per-sample gives a ratio of ≈1.0, as physics requires. The loop is fixed; the results file predates the fix and the 4× section should be read as unreliable until the next run replaces it.
 
 ### Interaction latency, frame pacing, blocking time
 
@@ -131,11 +131,11 @@ Regenerate with `npm run metrics`.
 
 | | Bundle (gzip) | State-layer SLOC | Files | Wiring SLOC outside the state layer |
 |---|---:|---:|---:|---:|
-| **Jotai** | 69.1 kB | 197 | 2 | 131 |
-| **MobX** | 83.1 kB | 266 | 1 | 106 |
-| **Zustand** | 65.9 kB | 299 | 3 | 124 |
+| **Jotai** | 69.2 kB | 198 | 2 | 131 |
+| **MobX** | 83.2 kB | 270 | 1 | 106 |
+| **Zustand** | 65.9 kB | 302 | 3 | 124 |
 | **Redux Toolkit** | 78.1 kB | 316 | 3 | 147 |
-| **RxJS** | 72.6 kB | 344 | 2 | 118 |
+| **RxJS** | 72.6 kB | 350 | 2 | 118 |
 
 SLOC is non-blank, non-comment lines, so an implementation is not penalised for explaining itself. Bundle size is gzip -9 of the emitted JS and includes React and the shared packages in every figure — only the *deltas* between rows are library cost. The wiring column is counted separately on purpose: excluding it entirely flatters whichever library pushes work into the screens, and folding it in flatters whichever pushes it into the store.
 
@@ -191,6 +191,8 @@ The limitations, at the same level of detail as the results. This section exists
 
 **Interaction latency and frame metrics did not resolve anything**, and a tie on a metric that cannot resolve differences is not evidence of equality.
 
+**No end-to-end test covers an alert *leaving* the panel.** The engines are unit-tested for it in all five, but the bug that actually shipped lived in the screen wiring, not the engine — and the seeded feed cannot produce a clearing transition to test against: its ±0.1% walk moves unrealised P&L by single-digit dollars against a $400 limit, so the only rule that responds to price never crosses its threshold. Closing this properly needs a deterministic way to drive the store from the browser, which the apps do not currently expose. It is an open gap, not a solved one.
+
 **Ten samples per cell.** Enough for the exact test to reach p ≈ 10⁻⁵ and survive a 144-way Holm correction, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
 
 **The change-cost result is one feature, measured once, by the person who wrote all five implementations.** A differently shaped feature would rank them differently, and the author knew every codebase intimately before starting the clock. One measurement is a data point, not a law.
@@ -241,7 +243,8 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 - [x] **Reproducible complexity metrics** — `npm run metrics`, CI-enforced
 - [x] **Change-cost experiment** — same feature added to all five from a frozen tag, diff measured
 - [ ] **Concurrency safety** — run dai-shi's tearing suite against all five
-- [ ] **Explain the CPU-throttling anomaly** — the 4× condition reports less scripting time for provably identical work
+- [ ] **Re-run the benchmark** with the corrected throttle interleaving, so the 4× section can be trusted
+- [ ] **End-to-end coverage for an alert leaving the panel** — needs a deterministic way to drive the store from the browser
 - [ ] **Live demo** on GitHub Pages with an implementation switcher
 
 ---
@@ -293,7 +296,7 @@ npm run metrics
 
 The parity suites are the acceptance gate: every implementation must pass the same functional tests and produce an identical derived-state vector before its performance is measured at all.
 
-Current counts: **157 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
+Current counts: **175 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
 
 ## Licence
 

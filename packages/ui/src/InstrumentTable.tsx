@@ -36,9 +36,12 @@ const InstrumentRow = memo(function InstrumentRow(
       // Keyboard-reachable: the row is the primary control on this screen and a
       // mouse-only selection is not an acceptable primary interaction.
       tabIndex={0}
-      aria-selected={selected}
       onClick={() => onSelect(row.id)}
       onKeyDown={(event) => {
+        // Only when the row itself has focus. Without this check the pin
+        // button's own Space and Enter bubble up here, get preventDefault'd,
+        // and select the row instead of toggling the pin.
+        if (event.target !== event.currentTarget) return;
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
           onSelect(row.id);

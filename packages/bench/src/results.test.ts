@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  median, rank, renderMarkdownTable, rendersPerQuoteCeiling, summariseMetric,
+  median, positionRendersPerQuoteCeiling, rank, renderMarkdownTable, rendersPerQuoteCeiling,
+  summariseMetric,
 } from './results';
 import type { BenchmarkReport, RunSample } from './results';
 
@@ -171,5 +172,16 @@ describe('renderMarkdownTable', () => {
     for (const line of table.split('\n').slice(2)) {
       expect(line).toMatch(/\[\d+\.\d+–\d+\.\d+\]/);
     }
+  });
+});
+
+describe('positionRendersPerQuoteCeiling', () => {
+  it('is 6.00 at the two lower rates, where the metric can see a broken implementation', () => {
+    expect(positionRendersPerQuoteCeiling(10)).toBeCloseTo(6, 10);
+    expect(positionRendersPerQuoteCeiling(100)).toBeCloseTo(6, 10);
+  });
+
+  it('is 1.00 at 1000 updates/sec — saturated, exactly like the instrument metric', () => {
+    expect(positionRendersPerQuoteCeiling(1000)).toBeCloseTo(1, 10);
   });
 });

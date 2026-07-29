@@ -83,6 +83,21 @@ export function rendersPerQuoteCeiling(rate: number): number {
   return (INSTRUMENT_COUNT * Math.min(rate, BATCHES_PER_SECOND)) / rate;
 }
 
+/**
+ * The same ceiling for the position table, which has six rows and receives the
+ * 6/50 of quotes that land on a held instrument. It works out to 6.00 at 10 and
+ * 100 updates/sec and **1.00 at 1000** — identical to the optimum, exactly as
+ * for the instrument table. An earlier version of this file exported
+ * POSITION_COUNT and computed this for nothing, so the sibling metric was
+ * published saturated while the README called the instrument-table ceiling its
+ * single most important caveat.
+ */
+export function positionRendersPerQuoteCeiling(rate: number): number {
+  const heldQuotesPerSecond = (rate * POSITION_COUNT) / INSTRUMENT_COUNT;
+  return (POSITION_COUNT * Math.min(heldQuotesPerSecond, BATCHES_PER_SECOND))
+    / heldQuotesPerSecond;
+}
+
 export type MetricKey =
   | 'scriptMsPerSecond' | 'taskMsPerSecond' | 'rendersPerQuote' | 'positionRendersPerQuote'
   | 'fps' | 'frameP99Ms' | 'droppedFrames' | 'totalBlockingMs' | 'interactionWorstMs';

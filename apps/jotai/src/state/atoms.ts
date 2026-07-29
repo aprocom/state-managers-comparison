@@ -81,7 +81,11 @@ export const applyQuoteAtom = atom(null, (get, set, quote: Quote) => {
   if (quote.seq <= cell.seq) return;
   const direction = nextDirection(cell.price, quote.price);
   if (quote.price === cell.price && cell.direction === direction) {
-    set(cellAtom, { ...cell, seq: quote.seq });
+    // Deliberately not writing. Writing a new cell object here — which this
+    // did — invalidates the row atom and re-renders one row for a quote that
+    // changed nothing, where the other four render none. The sequence number
+    // is only used to reject stale quotes, and a quote that changes nothing
+    // cannot be usefully stale.
     return;
   }
   set(cellAtom, { price: quote.price, direction, seq: quote.seq });
@@ -145,6 +149,11 @@ export const positionRowAtomFamily = atomFamily((id: string) => atom((get): Posi
 export const positionRowsAtom = atom((get): PositionRowModel[] => get(positionsAtom)
   .map((position) => get(positionRowAtomFamily(position.id)))
   .filter((row): row is PositionRowModel => row !== null));
+
+/** Newest-first, cached on the trades atom — the ordering Redux's entity
+ *  adapter keeps in the store for free. */
+export const sortedTradesAtom = atom((get) => [...get(tradesAtom)]
+  .sort((a, b) => b.closedAt - a.closedAt));
 
 /** Depends only on closed trades, so it survives every price tick. */
 export const drawdownAtom = atom((get) => maxDrawdown(equityCurve(get(tradesAtom))));
@@ -216,7 +225,7 @@ export const alertContextAtom = atom((get): AlertContext => {
     ),
     dailyLossLimit: DAILY_LOSS_LIMIT,
     riskLimitPerTrade: RISK_LIMIT_PER_TRADE,
-    recentClosedTrades: [...trades].sort((a, b) => b.closedAt - a.closedAt),
+    recentClosedTrades: get(sortedTradesAtom),
     openPositions: positions.map((position) => ({
       position,
       holdingMs: now - position.openedAt,

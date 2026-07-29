@@ -1,7 +1,7 @@
 import { avgHoldingMs, evaluateAlerts, unrealizedPnl } from '@smc/domain';
 import type { Alert, AlertContext } from '@smc/domain';
 import type { AppState, createAppStore } from './store';
-import { selectHeldPrices } from './selectors';
+import { memoizeOne, selectHeldPrices } from './selectors';
 
 export const DAILY_LOSS_LIMIT = 400;
 export const RISK_LIMIT_PER_TRADE = 100;
@@ -9,6 +9,16 @@ export const RISK_LIMIT_PER_TRADE = 100;
 function alertKey(alert: Alert): string {
   return `${alert.kind}:${alert.subjectId}`;
 }
+
+/**
+ * Sorting 250 trades on every alert evaluation was work Redux did not do — its
+ * entity adapter keeps them newest-first in the store. Memoising it here puts
+ * all five on the same footing; the residual difference is where the ordering
+ * lives, not how often it is computed.
+ */
+const sortedTrades = memoizeOne(
+  (trades: AppState['trades']) => [...trades].sort((a, b) => b.closedAt - a.closedAt),
+);
 
 export function buildAlertContext(state: AppState, now: number): AlertContext {
   const dailyPnl = state.positions.reduce(
@@ -21,7 +31,7 @@ export function buildAlertContext(state: AppState, now: number): AlertContext {
     dailyPnl,
     dailyLossLimit: DAILY_LOSS_LIMIT,
     riskLimitPerTrade: RISK_LIMIT_PER_TRADE,
-    recentClosedTrades: [...state.trades].sort((a, b) => b.closedAt - a.closedAt),
+    recentClosedTrades: sortedTrades(state.trades),
     openPositions: state.positions.map((position) => ({
       position,
       holdingMs: now - position.openedAt,

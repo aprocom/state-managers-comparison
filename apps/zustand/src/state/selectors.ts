@@ -26,7 +26,7 @@ const PRECISIONS = new Map(INSTRUMENTS.map((i) => [i.id, i.pricePrecision]));
  * untouched rows, and one explicit memo on the trade filter. MobX computeds
  * and Jotai derived atoms get both from their dependency graph.
  */
-function memoizeOne<A extends readonly unknown[], R>(
+export function memoizeOne<A extends readonly unknown[], R>(
   compute: (...args: A) => R,
 ): (...args: A) => R {
   let lastArgs: A | null = null;

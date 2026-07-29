@@ -30,7 +30,9 @@ async function readVector(page: Page, port: number): Promise<Record<string, stri
   vector['account.drawdown'] = (await page.getByTestId(TESTID.accountDrawdown).textContent()) ?? '';
 
   // The alert set, as a sorted key list. Content, not just visibility.
-  const alertIds = await page.getByTestId(TESTID.alertList).locator('[data-testid^="alert-"]')
+  // Scoped to elements carrying a kind, so the fired-count element that also
+  // lives in this list cannot satisfy the non-vacuity assertion below.
+  const alertIds = await page.getByTestId(TESTID.alertList).locator('[data-alert-kind]')
     .evaluateAll((nodes) => nodes
       .map((node) => node.getAttribute('data-testid') ?? '')
       .sort()

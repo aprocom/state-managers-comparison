@@ -9,7 +9,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
-  rank, renderMarkdownTable, rendersPerQuoteCeiling,
+  positionRendersPerQuoteCeiling, rank, renderMarkdownTable, rendersPerQuoteCeiling,
 } from '../packages/bench/src/results.ts';
 import { holmAdjust } from '../packages/bench/src/stats.ts';
 import type { BenchmarkReport, MetricKey } from '../packages/bench/src/results.ts';
@@ -192,8 +192,10 @@ for (const [index, cell] of cells.entries()) {
 
   lines.push(`**${cell.section.title}**`, '');
   if (cell.section.note !== '') lines.push(cell.section.note, '');
-  if (cell.section.metric === 'rendersPerQuote') {
-    const ceiling = rendersPerQuoteCeiling(cell.rate);
+  if (cell.section.metric === 'rendersPerQuote' || cell.section.metric === 'positionRendersPerQuote') {
+    const ceiling = cell.section.metric === 'rendersPerQuote'
+      ? rendersPerQuoteCeiling(cell.rate)
+      : positionRendersPerQuoteCeiling(cell.rate);
     lines.push(
       `Optimal is 1.00. The metric's ceiling at this rate is ${ceiling.toFixed(2)}`
       + (ceiling === 1

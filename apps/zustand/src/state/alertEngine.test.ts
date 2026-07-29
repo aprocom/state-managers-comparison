@@ -83,13 +83,16 @@ describe('attachAlertEngine', () => {
     detach();
   });
 
-  it('stops evaluating once detached', () => {
+  it('stops evaluating once detached — with a change that would otherwise fire', () => {
     const s = store();
     const onFire = vi.fn<(alert: Alert) => void>();
     const detach = attachAlertEngine(s, { now: () => NOW, onFire });
     detach();
     onFire.mockClear();
-    s.getState().applyQuote({ instrumentId: 'BTC-USDT', price: 61000, ts: NOW, seq: 1 });
+    // 61000 moves nothing past a threshold, so the previous version of this
+    // test passed with a no-op in place of detach(). 20000 provably crosses
+    // the daily loss limit, which is what the other four implementations use.
+    s.getState().applyQuote({ instrumentId: 'BTC-USDT', price: 20000, ts: NOW, seq: 2 });
     expect(onFire).not.toHaveBeenCalled();
   });
 });

@@ -220,6 +220,11 @@ export function createAppStore(options: StoreOptions): AppStore {
    * a 250-element copy, sort and scan ran on every one of a thousand quotes a
    * second, because priceState$ emits per quote.
    */
+  const sortedTrades$ = tradesSource$.pipe(
+    map((trades) => [...trades].sort((a, b) => b.closedAt - a.closedAt)),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
   const drawdown$ = tradesSource$.pipe(
     map((trades) => maxDrawdown(equityCurve(trades))),
     shareReplay({ bufferSize: 1, refCount: false }),
@@ -301,8 +306,10 @@ export function createAppStore(options: StoreOptions): AppStore {
 
   // --- Alerts ----------------------------------------------------------------
 
-  const alertContext$ = combineLatest([positionsSource$, heldPrices$, tradesSource$]).pipe(
-    map(([positions, heldPrices, trades]): AlertContext => {
+  const alertContext$ = combineLatest([
+    positionsSource$, heldPrices$, tradesSource$, sortedTrades$,
+  ]).pipe(
+    map(([positions, heldPrices, trades, sortedTrades]): AlertContext => {
       // The frozen clock, not Date.now() — see the note in the alert engine.
       const now = options.now;
       return {
@@ -314,7 +321,7 @@ export function createAppStore(options: StoreOptions): AppStore {
         ),
         dailyLossLimit: DAILY_LOSS_LIMIT,
         riskLimitPerTrade: RISK_LIMIT_PER_TRADE,
-        recentClosedTrades: [...trades].sort((a, b) => b.closedAt - a.closedAt),
+        recentClosedTrades: sortedTrades,
         openPositions: positions.map((position) => ({
           position,
           holdingMs: now - position.openedAt,

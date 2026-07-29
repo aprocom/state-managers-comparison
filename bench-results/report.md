@@ -84,6 +84,8 @@ Optimal is 1.00. The metric's ceiling at this rate is 50.00, so a fully unmemois
 
 Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
 
+Optimal is 1.00. The metric's ceiling at this rate is 6.00, so a fully unmemoised implementation would be plainly visible.
+
 | | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 1.00 [1.00–1.00] | — | best |
@@ -158,6 +160,8 @@ Optimal is 1.00. The metric's ceiling at this rate is 10.00, so a fully unmemois
 
 Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
 
+Optimal is 1.00. The metric's ceiling at this rate is 6.00, so a fully unmemoised implementation would be plainly visible.
+
 | | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 1.00 [1.00–1.00] | — | best |
@@ -231,6 +235,8 @@ Optimal is 1.00. The metric's ceiling at this rate is 1.00 — which is also the
 **Position row renders per quote on a held instrument**
 
 Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+Optimal is 1.00. The metric's ceiling at this rate is 1.00 — which is also the optimum, so this metric distinguishes nothing here and is printed only to show that it cannot.
 
 | | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
@@ -310,6 +316,8 @@ Optimal is 1.00. The metric's ceiling at this rate is 50.00, so a fully unmemois
 
 Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
 
+Optimal is 1.00. The metric's ceiling at this rate is 6.00, so a fully unmemoised implementation would be plainly visible.
+
 | | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 1.00 [1.00–1.00] | — | best |
@@ -384,6 +392,8 @@ Optimal is 1.00. The metric's ceiling at this rate is 10.00, so a fully unmemois
 
 Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
 
+Optimal is 1.00. The metric's ceiling at this rate is 6.00, so a fully unmemoised implementation would be plainly visible.
+
 | | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
 | **zustand** | 1.00 [1.00–1.00] | — | best |
@@ -457,6 +467,8 @@ Optimal is 1.00. The metric's ceiling at this rate is 1.00 — which is also the
 **Position row renders per quote on a held instrument**
 
 Denominator measured by the feed, not assumed. This is the metric that caught MobX and Jotai deriving all six rows from one coarse computation.
+
+Optimal is 1.00. The metric's ceiling at this rate is 1.00 — which is also the optimum, so this metric distinguishes nothing here and is printed only to show that it cannot.
 
 | | positionRendersPerQuote, median [95% CI] | p (Holm-adjusted) | effect |
 |---|---:|---:|---|
