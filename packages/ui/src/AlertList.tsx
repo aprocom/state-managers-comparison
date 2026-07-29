@@ -7,7 +7,8 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
       {alerts.map((alert) => (
         <li
           key={`${alert.kind}:${alert.subjectId}`}
-          data-testid={TESTID.alert(alert.kind)}
+          data-testid={TESTID.alert(alert.kind, alert.subjectId)}
+          data-alert-kind={alert.kind}
           className={`alert alert--${alert.kind}`}
         >
           {alert.message}

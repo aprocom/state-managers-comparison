@@ -55,7 +55,7 @@ No backend, no network, no auth. The quote feed is a seeded generator, the trade
 
 Stated in full, because in this genre the methodology *is* the contribution.
 
-**Parity first.** Two suites gate the benchmark. `parity.spec.ts` drives all five apps through the same eight functional tests via a shared `data-testid` contract. `cross-app-parity.spec.ts` reads an exact value vector from every implementation — closed-trade statistics under three filters, the first twenty journal rows cell by cell, risk and drawdown totals, the alert key set — and requires all five to be **identical**, not merely individually plausible. Benchmarking apps that behave differently would be meaningless, and the first version of this project did exactly that for weeks without noticing.
+**Parity first.** Two suites gate the benchmark. `parity.spec.ts` drives all five apps through the same ten functional tests via a shared `data-testid` contract. `cross-app-parity.spec.ts` reads an exact value vector from every implementation — closed-trade statistics under three filters, the first twenty journal rows cell by cell, risk and drawdown totals, the alert key set — and requires all five to be **identical**, not merely individually plausible. Benchmarking apps that behave differently would be meaningless, and the first version of this project did exactly that for weeks without noticing.
 
 **Production builds.** `vite preview` over `vite build` output, React 19 production. StrictMode is on in all five, which does not double-render outside development.
 
@@ -215,7 +215,7 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 
 - [x] **Foundation** — monorepo, shared domain package, shared component library
 - [x] **All five implementations** — idiomatic per each library's own docs
-- [x] **Functional parity** — 41 e2e tests, including exact cross-app equality of derived state
+- [x] **Functional parity** — 51 e2e tests, including exact cross-app equality of derived state
 - [x] **Benchmark harness** — CPU, interaction latency, frame pacing, TBT, render granularity, at two CPU conditions, with confidence intervals and significance tests
 - [x] **Reproducible complexity metrics** — `npm run metrics`, CI-enforced
 - [x] **Change-cost experiment** — same feature added to all five from a frozen tag, diff measured
@@ -270,6 +270,8 @@ npm run metrics
 ```
 
 The parity suites are the acceptance gate: every implementation must pass the same functional tests and produce an identical derived-state vector before its performance is measured at all.
+
+Current counts: **157 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
 
 ## Licence
 

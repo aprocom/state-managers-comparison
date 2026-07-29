@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { arch, cpus, platform, totalmem } from 'node:os';
 import { expect, test } from '@playwright/test';
 import type { CDPSession, Page } from '@playwright/test';
 import { INSTRUMENTS } from '@smc/domain';
@@ -31,6 +33,16 @@ const CPU_THROTTLES = (process.env['BENCH_THROTTLE'] ?? '1,4')
 test.describe.configure({ mode: 'serial' });
 
 const CLICK_TARGETS = INSTRUMENTS.slice(0, INTERACTION_CLICKS).map((i) => i.id);
+
+function gitDescribe(): string {
+  try {
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD']).toString().trim();
+    const dirty = execFileSync('git', ['status', '--porcelain']).toString().trim() !== '';
+    return dirty ? `${sha}-dirty` : sha;
+  } catch {
+    return 'unknown';
+  }
+}
 
 interface Instrumentation {
   __SMC_RENDERS__: { instrumentRow: number; positionRow: number; journalRow: number };
@@ -218,6 +230,16 @@ test('benchmark — all implementations, interleaved', async ({ page }) => {
   writeFileSync(
     'bench-results/latest.json',
     `${JSON.stringify({
+      // Recorded so a published number can be traced to the exact tree that
+      // produced it. A benchmark result without a commit is an anecdote.
+      commit: gitDescribe(),
+      environment: {
+        platform: `${platform()} ${arch()}`,
+        cpuModel: cpus()[0]?.model ?? 'unknown',
+        cpuCount: cpus().length,
+        totalMemGb: Math.round(totalmem() / 1024 ** 3),
+        node: process.version,
+      },
       soakMs: SOAK_MS,
       repeats: REPEATS,
       rates: RATES,

@@ -25,7 +25,7 @@ for (const target of APP_TARGETS) {
     });
 
     test('raises the seeded risk-per-trade alert', async ({ page }) => {
-      await expect(page.getByTestId(TESTID.alert('risk-per-trade'))).toBeVisible();
+      await expect(page.locator('[data-alert-kind="risk-per-trade"]').first()).toBeVisible();
     });
 
     test('pins an instrument to the top of the table', async ({ page }) => {

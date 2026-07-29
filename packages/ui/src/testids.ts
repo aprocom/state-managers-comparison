@@ -24,7 +24,12 @@ export const TESTID = {
   accountDrawdown: 'account-drawdown',
   accountPinned: 'account-pinned',
 
-  alert: (kind: AlertKind) => `alert-${kind}`,
+  /** Includes the subject: the seeded fixture raises several time-in-trade
+   *  alerts at once, and a kind-only id matches all of them, which fails
+   *  Playwright's strict mode and silently weakens any assertion using it. */
+  alert: (kind: AlertKind, subjectId?: string) => (subjectId === undefined
+    ? `alert-${kind}`
+    : `alert-${kind}-${subjectId}`),
   alertList: 'alert-list',
 
   tradeRow: (id: string) => `trade-row-${id}`,

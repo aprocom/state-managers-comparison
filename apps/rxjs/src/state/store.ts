@@ -152,6 +152,7 @@ export function createAppStore(options: StoreOptions): AppStore {
     pinToggles$.pipe(map((id) => ({ pin: id }))),
   );
 
+  const rowSequences = new Map<InstrumentId, number>();
   const orderedRows$ = rowEvents$.pipe(
     scan((rows: InstrumentRowModel[], event: Quote | { pin: InstrumentId }) => {
       if ('pin' in event) {
@@ -165,6 +166,11 @@ export function createAppStore(options: StoreOptions): AppStore {
       }
       const index = INDEX_BY_ID.get(event.instrumentId);
       if (index === undefined) return rows;
+      // The same staleness guard priceState$ applies. Without it an
+      // out-of-order quote rewrites the row while the price stream rejects it,
+      // and the price column disagrees with the position marks.
+      if (event.seq <= (rowSequences.get(event.instrumentId) ?? 0)) return rows;
+      rowSequences.set(event.instrumentId, event.seq);
       const current = rows[index];
       if (current === undefined || current.price === event.price) return rows;
       const next = rows.slice();

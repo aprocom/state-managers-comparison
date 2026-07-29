@@ -14,6 +14,10 @@ import type { BenchmarkReport } from '../packages/bench/src/results.ts';
 interface RawReport extends BenchmarkReport {
   rates: number[];
   cpuThrottles: number[];
+  commit?: string;
+  environment?: {
+    platform: string; cpuModel: string; cpuCount: number; totalMemGb: number; node: string;
+  };
 }
 
 const report = JSON.parse(
@@ -35,6 +39,20 @@ const lines: string[] = [
   'not be read as a ranking.',
   '',
 ];
+
+if (report.commit !== undefined && report.environment !== undefined) {
+  const env = report.environment;
+  lines.push(
+    `Commit \`${report.commit}\` · ${env.cpuModel} (${env.cpuCount} threads) · `
+    + `${env.totalMemGb} GB · ${env.platform} · node ${env.node}`,
+    '',
+    report.commit.endsWith('-dirty')
+      ? '> **The working tree was dirty when this ran.** These numbers cannot be '
+        + 'traced to a commit and should be re-run before they are quoted.'
+      : '',
+    '',
+  );
+}
 
 for (const cpuThrottle of report.cpuThrottles) {
   lines.push(
