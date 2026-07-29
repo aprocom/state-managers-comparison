@@ -13,7 +13,7 @@ The same app is built five times. Everything except the state layer is shared: d
 ## The short version
 
 1. **On this workload, the state manager is not the bottleneck** — but that sentence has to be earned, not asserted, and the earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
-2. **What separates the five is main-thread CPU** — a 2.4× spread producing output the cross-app suite proves identical, MobX cheapest and Redux most expensive. The output is the same; the work behind it is not, and that difference is the finding rather than a flaw in the setup. Render counts, frame rate, interaction latency and blocking time separate nothing, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
+2. **The only axis where anything separates is main-thread CPU, and even there only two of the five separate** — MobX and RxJS cost roughly half what Redux and Jotai do at 1000 updates/sec, on output the cross-app suite proves identical, but after correcting for every comparison the report makes, just 11 of 360 survive. Render counts, frame rate, interaction latency and blocking time separate nothing at any rate, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
 3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work — more than every architectural difference between the five combined.
 4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
 
@@ -103,19 +103,23 @@ The fix was a per-position `computed` in MobX and a `positionRowAtomFamily` in J
 
 ### Main-thread CPU
 
-The only axis on which the five separate, and the one the render-count metric hid completely.
+The only axis on which anything separates at all, and the one the render-count metric hid completely.
 
-Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrottled, median of 10 with a bootstrap 95% CI, p Holm-adjusted across all 144 comparisons the report makes:
+Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrottled, median of 10 with a bootstrap 95% CI, p Holm-adjusted across all 360 pairwise comparisons these samples admit:
 
 | | CPU ms/s | p | effect |
 |---|---:|---:|---|
-| **MobX** | 37.2 [35.6–37.7] | — | best |
-| **RxJS** | 44.8 [42.9–46.3] | 0.0016 | large |
-| **Zustand** | 74.4 [73.3–76.9] | 0.0016 | large |
-| **Jotai** | 87.5 [85.3–89.7] | 0.0016 | large |
-| **Redux Toolkit** | 89.2 [81.0–90.4] | 0.0016 | large |
+| **MobX** | 29.6 [21.0–35.7] | — | best |
+| **RxJS** | 37.0 [25.3–40.6] | 1.0000 | not significant |
+| **Zustand** | 58.9 [39.8–66.3] | 0.0718 | not significant |
+| **Redux Toolkit** | 72.3 [50.9–82.0] | 0.0039 | large |
+| **Jotai** | 79.4 [51.1–87.6] | 0.0039 | large |
 
-A 2.4× spread between the cheapest and the most expensive, on output the cross-app suite verifies is identical. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `a84ad60`, which is recorded in the results file; nothing under `apps/` or `packages/` has changed since, so the numbers describe the tree you are reading.
+**Two of the four gaps survive the correction. Read the table as that, not as a ranking of five.** The medians span 2.7×, but the intervals are wide and heavily overlapping, and only Redux and Jotai are separated from MobX by more than this study can attribute to noise. Zustand at p = 0.07 is the kind of result that becomes a finding only if you go looking for one. RxJS is not distinguishable from MobX here at all. Under 4× throttling Zustand separates as well and the rest holds; at 10 and 100 updates/sec **nothing separates from anything, on any metric**. Across the entire report, five printed comparisons survive the correction and all five are this metric at this rate — eleven survive out of the full 360-pair family, which includes pairs the tables do not print.
+
+What did replicate across two independent 35-minute runs on this machine is the *grouping*: MobX and RxJS at the top, the other three at the bottom, which is also the split predicted by the per-quote work table below. What did not replicate is the order inside the bottom group — the previous run had Zustand 74.4, Jotai 87.5, Redux 89.2 and this one has Zustand 58.9, Redux 72.3, Jotai 79.4. Anyone quoting a first-to-fifth ordering from this project is quoting noise.
+
+Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `5f4a143`, recorded in the results file, from a clean working tree; nothing under `apps/` or `packages/` has changed since.
 
 **Read this ranking knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. This is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
 
@@ -131,7 +135,17 @@ A 2.4× spread between the cheapest and the most expensive, on output the cross-
 
 The two coarse ones are not sloppy: a store-plus-selectors design derives from a snapshot, and mapping the collection is the idiomatic way to do it. Making them per-row would mean hand-writing a subscription per instrument, which is what the fine-grained libraries are *for*. So this table is a genuine architectural difference between the approaches rather than a handicap I imposed on two of them — and it is the most plausible explanation for the ordering above.
 
-**The 4× throttling numbers in the current results file are contaminated, and the cause was my harness.** That section reported *less* scripting time than the unthrottled one for provably identical work. I published it as an unexplained CDP anomaly. It was not: the throttle level sat outside the per-implementation loop, so all five 1× samples ran and then all five 4× samples about a minute later, and any drift in machine state mapped systematically onto the condition — the same bias that interleaving the implementations was introduced to remove, one level up, twice. The step is visible in the committed samples: every app's 4×/1× ratio jumps at the same repeat, in the same direction, at every rate, which no property of an app can explain. A controlled check with the throttle applied per-sample gives a ratio of ≈1.0, as physics requires. The loop is fixed; the results file predates the fix and the 4× section should be read as unreliable until the next run replaces it.
+**The 4× throttling anomaly had two causes, and neither of them was CDP being broken.** The symptom: that section reported *less* scripting time than the unthrottled one, for work the harness proves identical. I first published it as an unexplained anomaly, which is the least useful thing to do with one.
+
+The first cause was mine. The throttle level sat outside the per-implementation loop, so all five 1× samples ran and then all five 4× samples a minute later, and any drift in machine state mapped systematically onto the condition — the same bias interleaving the implementations was introduced to remove, one level up. The step is visible in the old samples: every app's ratio jumps at the same repeat, in the same direction, at every rate, which no property of an app can explain. Fixing the loop moved the 4×/1× ratios from 0.2–0.3 to 0.74–1.18.
+
+The second cause is what the residue was, and it took an experiment rather than an argument. **`ScriptDuration` does not measure the CPU that throttling charges you.** Chromium emulates a slower processor by making the renderer thread spin, and the spin sits outside every script and every task, so the script counter never sees it. [`scripts/throttle-probe.mjs`](scripts/throttle-probe.mjs) shows this on a page doing a fixed amount of arithmetic on a timer: at 4× the tick count and frame count are identical, `ScriptDuration` moves about 1.2×, and `ThreadTime` moves about 28× — from ~135 ms to ~3.8 s of a 5-second soak, which is 76% of the thread, exactly what stealing three quarters of a CPU looks like. Run it yourself:
+
+```bash
+npm run probe:throttle
+```
+
+The benchmark now records `threadMsPerSecond` alongside the script counter, so the same thing is checkable in this project's own samples: between the two levels scripting time moves 0.67×–0.99× while renderer thread time moves 10×–12×. So the ratio being near or below 1 was never physically impossible — it was a counter answering a question I wasn't asking. **The ordering within each throttle section is measured identically for all five and is comparable. The magnitudes between sections are not, and no amount of re-running will make them so.**
 
 ### Interaction latency, frame pacing, blocking time
 
@@ -146,7 +160,7 @@ Regenerate with `npm run metrics`.
 | **Jotai** | 69.2 kB | 197 | 2 | 131 |
 | **MobX** | 83.2 kB | 270 | 1 | 106 |
 | **Zustand** | 65.9 kB | 302 | 3 | 124 |
-| **Redux Toolkit** | 78.1 kB | 316 | 3 | 147 |
+| **Redux Toolkit** | 78.2 kB | 316 | 3 | 147 |
 | **RxJS** | 72.6 kB | 350 | 2 | 118 |
 
 SLOC is non-blank, non-comment lines, so an implementation is not penalised for explaining itself. Bundle size is gzip -9 of the emitted JS and includes React and the shared packages in every figure — only the *deltas* between rows are library cost. The wiring column is counted separately on purpose: excluding it entirely flatters whichever library pushes work into the screens, and folding it in flatters whichever pushes it into the store.
@@ -258,8 +272,8 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 - [x] **Benchmark harness** — CPU, interaction latency, frame pacing, TBT, render granularity, at two CPU conditions, with bootstrap intervals, exact rank tests and a family-wise correction
 - [x] **Reproducible complexity metrics** — `npm run metrics`, CI-enforced
 - [x] **Change-cost experiment** — same feature added to all five from a frozen tag, diff measured
+- [x] **The throttling anomaly, explained rather than declared** — the harness loop order was one cause; the other is that `ScriptDuration` cannot see the CPU that throttling charges, demonstrated by `npm run probe:throttle` and recorded per sample as `threadMsPerSecond`
 - [ ] **Concurrency safety** — run dai-shi's tearing suite against all five
-- [ ] **Re-run the benchmark** with the corrected throttle interleaving, so the 4× section can be trusted
 - [ ] **End-to-end coverage for an alert leaving the panel** — needs a deterministic way to drive the store from the browser
 - [ ] **Live demo** on GitHub Pages with an implementation switcher
 

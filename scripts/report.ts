@@ -196,48 +196,44 @@ lines.push(
 );
 
 /**
- * Scripting time under throttling divided by scripting time unthrottled, per
- * implementation. Throttling cannot make identical work cost less wall-clock
- * time, so a ratio below 1 is a fact about the harness rather than about any
- * app — this project published one once, at 0.2–0.3, caused by the throttle
- * level sitting outside the per-implementation loop so that machine drift
- * mapped systematically onto the condition. The check is computed here rather
- * than asserted in prose so it cannot go stale.
+ * How each counter responds to throttling, computed from the samples rather
+ * than narrated, so the explanation cannot drift from the data under it.
+ *
+ * `ScriptDuration` barely moves between throttle levels and `ThreadTime`
+ * multiplies. That is not a bug in either counter: Chromium emulates a slower
+ * CPU by making the renderer thread spin, the spin lands outside every script
+ * and task, and only the thread-time counter sees it. `npm run probe:throttle`
+ * demonstrates the same thing on a page doing provably fixed work.
  */
 function throttleRatioText(cpuThrottle: number): string {
-  const ratios = report.results.map((result) => {
-    const at = (throttle: number) => median(result.samples
-      .filter((sample) => sample.cpuThrottle === throttle)
-      .map((sample) => sample.scriptMsPerSecond));
-    const unthrottled = at(1);
-    return {
-      name: result.name,
-      ratio: unthrottled === 0 ? Number.NaN : at(cpuThrottle) / unthrottled,
-    };
-  }).filter((entry) => Number.isFinite(entry.ratio));
-  if (ratios.length === 0) return '';
+  const ratio = (metric: 'scriptMsPerSecond' | 'threadMsPerSecond') => report.results
+    .map((result) => {
+      const at = (throttle: number) => median(result.samples
+        .filter((sample) => sample.cpuThrottle === throttle)
+        .map((sample) => sample[metric]));
+      const unthrottled = at(1);
+      return unthrottled === 0 ? Number.NaN : at(cpuThrottle) / unthrottled;
+    })
+    .filter((value) => Number.isFinite(value));
 
-  const values = ratios.map((entry) => entry.ratio);
-  const low = Math.min(...values);
-  const high = Math.max(...values);
-  const range = `${low.toFixed(2)}× to ${high.toFixed(2)}×`;
-  const perApp = ratios
-    .map((entry) => `${entry.name} ${entry.ratio.toFixed(2)}×`)
-    .join(', ');
+  const script = ratio('scriptMsPerSecond');
+  const thread = ratio('threadMsPerSecond');
+  if (script.length === 0) return 'Nominally a mid-range phone.';
 
-  if (low < 0.95) {
-    return `**These numbers are not trustworthy.** Scripting time under ${cpuThrottle}×`
-      + ` throttling comes to ${range} of the unthrottled figure (${perApp}), and a value`
-      + ' below 1 says the same work cost less wall-clock time when the CPU was made'
-      + ' slower, which cannot happen. Something in the collection is wrong — the last'
-      + ' time this appeared it was the harness loop order, not CDP. Read the ordering'
-      + ' within this section only, and do not quote the levels.';
-  }
-  return `Nominally a mid-range phone. Scripting time comes to ${range} of the unthrottled`
-    + ` figure (${perApp}) — above 1, as it must be, since throttling cannot make the same`
-    + ' work cheaper. **The levels are still not comparable across sections**, because'
-    + ' throttling changes how much of the fixed-rate feed the page can keep up with;'
-    + ' compare the ordering within a section, not the magnitudes between them.';
+  const span = (values: number[]) => (values.length === 0
+    ? 'not recorded'
+    : `${Math.min(...values).toFixed(2)}×–${Math.max(...values).toFixed(2)}×`);
+
+  return 'Nominally a mid-range phone. **Do not compare these magnitudes with the 1×'
+    + ' section**, and note that the reason is a property of the tool rather than of the'
+    + ' apps. Between the two levels the same quotes are delivered, the same rows render'
+    + ` and the frame rate is the same, yet scripting time moves only ${span(script)}`
+    + ` while renderer thread time moves ${span(thread)}. Chromium emulates a slower CPU`
+    + ' by making the renderer thread spin, and the spin sits outside every script and'
+    + ' every task, so `ScriptDuration` never sees the CPU it was charged —'
+    + ' `ThreadTime` does. Run `npm run probe:throttle` to watch it happen on a page'
+    + ' doing fixed work. The ordering within this section is measured the same way for'
+    + ' all five and is comparable; the levels are not.';
 }
 
 for (const [index, cell] of cells.entries()) {
