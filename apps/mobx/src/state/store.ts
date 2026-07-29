@@ -310,8 +310,11 @@ export class AppStore {
   /**
    * A plain computed, and a pure one: every input is either observable or the
    * frozen clock. MobX recomputes it only when something it actually read
-   * changes, and the `reaction` below turns that into fire-once notification
-   * without any bookkeeping — no key Set, no previous-value diffing.
+   * changes, which is what makes the `reaction` below cheap enough to run on a
+   * 1000/s feed. It does not make the reaction bookkeeping-free: fire-once
+   * notification still needs the key Set in `attachAlertEngine`, because a
+   * reaction fires on *any* change to the alert set and an alert that was
+   * already fired must not fire again.
    */
   get alerts(): Alert[] {
     return evaluateAlerts(this.buildAlertContext(this.now));

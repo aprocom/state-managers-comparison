@@ -4,7 +4,7 @@ Five React state managers, one non-trivial application, measured properly — in
 
 **RxJS · Redux Toolkit · MobX · Zustand · Jotai**
 
-The same app is built five times. Everything except the state layer is shared: domain types, all P&L and statistics maths, every presentational component. The implementations differ *only* in how state is stored, derived and propagated, and a cross-app test suite asserts that all five produce byte-identical derived state before any of them is timed.
+The same app is built five times. Everything except the state layer is shared: domain types, all P&L and statistics maths, every presentational component. The implementations differ *only* in how state is stored, derived and propagated, and a cross-app test suite asserts that all five produce an identical derived-state vector — cell by cell — before any of them is timed. That vector covers everything computed from the seeded fixture and deliberately excludes everything downstream of the live feed: no two page loads observe a 1000/s stream at the same instant, so comparing unrealised P&L across apps would be comparing timing. It is a real hole in the gate, and it is listed as one in [What this cannot tell you](#what-this-cannot-tell-you).
 
 **If you read one section, read [What this cannot tell you](#what-this-cannot-tell-you).** It is the point of the project. A comparison whose author has not tried to break it is a rumour with numbers attached.
 
@@ -13,7 +13,7 @@ The same app is built five times. Everything except the state layer is shared: d
 ## The short version
 
 1. **On this workload, the state manager is not the bottleneck** — but that sentence has to be earned, not asserted, and the earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
-2. **What separates the five is main-thread CPU** — a 2.4× spread on work the cross-app suite proves identical, MobX cheapest and Redux most expensive. Render counts, frame rate, interaction latency and blocking time separate nothing, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
+2. **What separates the five is main-thread CPU** — a 2.4× spread producing output the cross-app suite proves identical, MobX cheapest and Redux most expensive. The output is the same; the work behind it is not, and that difference is the finding rather than a flaw in the setup. Render counts, frame rate, interaction latency and blocking time separate nothing, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
 3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work — more than every architectural difference between the five combined.
 4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
 
@@ -117,7 +117,19 @@ Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrott
 
 A 2.4× spread between the cheapest and the most expensive, on output the cross-app suite verifies is identical. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `a84ad60`, which is recorded in the results file; nothing under `apps/` or `packages/` has changed since, so the numbers describe the tree you are reading.
 
-**Read this ranking knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. All five now do the same work per quote. But this is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
+**Read this ranking knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. This is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
+
+**What the five do per quote is still not the same, and that is the point of this column.** They render the same thing — one instrument row, one position row — but they arrive at it differently, and the difference is visible in the source:
+
+| | per quote, before any row renders |
+|---|---|
+| **MobX** | one observable write; one `computed` row recomputed |
+| **Jotai** | one atom write; one row atom recomputed |
+| **RxJS** | one row rewritten incrementally by `scan`, but all six position rows re-mapped |
+| **Zustand** | all 50 instrument rows re-derived, then identity-cached down to the one that moved |
+| **Redux Toolkit** | the same 50, through a reselect selector, plus the action and reducer round trip |
+
+The two coarse ones are not sloppy: a store-plus-selectors design derives from a snapshot, and mapping the collection is the idiomatic way to do it. Making them per-row would mean hand-writing a subscription per instrument, which is what the fine-grained libraries are *for*. So this table is a genuine architectural difference between the approaches rather than a handicap I imposed on two of them — and it is the most plausible explanation for the ordering above.
 
 **The 4× throttling numbers in the current results file are contaminated, and the cause was my harness.** That section reported *less* scripting time than the unthrottled one for provably identical work. I published it as an unexplained CDP anomaly. It was not: the throttle level sat outside the per-implementation loop, so all five 1× samples ran and then all five 4× samples about a minute later, and any drift in machine state mapped systematically onto the condition — the same bias that interleaving the implementations was introduced to remove, one level up, twice. The step is visible in the committed samples: every app's 4×/1× ratio jumps at the same repeat, in the same direction, at every rate, which no property of an app can explain. A controlled check with the throttle applied per-sample gives a ratio of ≈1.0, as physics requires. The loop is fixed; the results file predates the fix and the 4× section should be read as unreliable until the next run replaces it.
 
@@ -131,7 +143,7 @@ Regenerate with `npm run metrics`.
 
 | | Bundle (gzip) | State-layer SLOC | Files | Wiring SLOC outside the state layer |
 |---|---:|---:|---:|---:|
-| **Jotai** | 69.2 kB | 198 | 2 | 131 |
+| **Jotai** | 69.2 kB | 197 | 2 | 131 |
 | **MobX** | 83.2 kB | 270 | 1 | 106 |
 | **Zustand** | 65.9 kB | 302 | 3 | 124 |
 | **Redux Toolkit** | 78.1 kB | 316 | 3 | 147 |
@@ -191,6 +203,8 @@ The limitations, at the same level of detail as the results. This section exists
 
 **Interaction latency and frame metrics did not resolve anything**, and a tie on a metric that cannot resolve differences is not evidence of equality.
 
+**The cross-app gate never compares anything downstream of the live feed.** Prices, unrealised P&L and the account total move with a stream that no two page loads observe at the same instant, so the vector compares only what the seeded fixture determines. Everything the feed touches is checked per app against loose predicates instead — "the price changed", "P&L moved" — and that is precisely the weaker kind of assertion this project has already been burned by. A divergence that only shows up mid-stream would survive the gate; one did, and is item 11 below.
+
 **No end-to-end test covers an alert *leaving* the panel.** The engines are unit-tested for it in all five, but the bug that actually shipped lived in the screen wiring, not the engine — and the seeded feed cannot produce a clearing transition to test against: its ±0.1% walk moves unrealised P&L by single-digit dollars against a $400 limit, so the only rule that responds to price never crosses its threshold. Closing this properly needs a deterministic way to drive the store from the browser, which the apps do not currently expose. It is an open gap, not a solved one.
 
 **Ten samples per cell.** Enough for the exact test to reach p ≈ 10⁻⁵ and survive a 144-way Holm correction, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
@@ -216,7 +230,9 @@ Kept because they are more instructive than the results, and because they are al
 9. **The alert panel that could never clear.** MobX and Jotai rendered the alert list from the `onFire` callback. `onFire` runs for newly triggered alerts only, so nothing fires on the way out and a cleared alert stayed on screen forever — in the feature the README calls the sharpest part of the comparison, and in the two implementations whose fine-grained reactivity is supposed to make exactly this easy.
 10. **Four vacuous tests.** "Stops firing once detached" detached the engine, applied a quote that could not move any rule past its threshold, and asserted nothing fired. Replacing `detach()` with a no-op left all four passing. The alert engine's reactivity was untested in four of five implementations.
 
-Numbers 1, 2 and 6 I found myself. **Numbers 3 through 5 and 7 through 10 were found by adversarial review after the project had been written up as finished — twice.** That ratio is the honest headline of this section: attacking your own work catches some of it, and having something else attack it catches the rest.
+11. **The staleness guard that swallowed itself.** Jotai kept its per-instrument sequence number inside the same atom as the price, and skipped the write when a quote repeated the current price — correctly, since none of the five re-render for a quote that moves nothing. But skipping the write also skipped the sequence number, so an out-of-order quote that the other four reject as stale would be *accepted* here and would move the price backwards. Nothing catches it: the prices agree right up to the instant they stop agreeing, the seeded feed is strictly ordered so it cannot occur in this app, and the cross-app gate does not compare live prices at all. The fix splits the sequence into its own atom, and all five now carry the same test.
+
+Numbers 1, 2 and 6 I found myself. **Numbers 3 through 5, 7 through 10 and 11 were found by adversarial review after the project had been written up as finished — three times.** That ratio is the honest headline of this section: attacking your own work catches some of it, and having something else attack it catches the rest.
 
 ---
 

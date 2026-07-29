@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  median, positionRendersPerQuoteCeiling, rank, renderMarkdownTable, rendersPerQuoteCeiling,
-  summariseMetric,
+  allPairwise, median, pairKey, positionRendersPerQuoteCeiling, rank, renderMarkdownTable,
+  rendersPerQuoteCeiling, summariseMetric,
 } from './results';
 import type { BenchmarkReport, RunSample } from './results';
 
@@ -152,6 +152,31 @@ describe('rank', () => {
       'scriptMsPerSecond', AT_100,
     );
     expect(ranked[1]?.vsBest?.p).toBeGreaterThan(0.05);
+  });
+});
+
+describe('allPairwise', () => {
+  it('covers every pair, not only the ones a table prints', () => {
+    const pairs = allPairwise(
+      report({ a: [1, 2, 3], b: [4, 5, 6], c: [7, 8, 9] }), 'scriptMsPerSecond', AT_100,
+    );
+    expect(pairs).toHaveLength(3);
+    expect(pairs.map((pair) => pairKey(pair.a, pair.b)).sort())
+      .toEqual(['a|b', 'a|c', 'b|c']);
+  });
+
+  it('includes the comparison the vs-best column shows', () => {
+    const data = report({ fast: [10, 11, 12], slow: [90, 91, 92] });
+    const ranked = rank(data, 'scriptMsPerSecond', AT_100);
+    const pairs = allPairwise(data, 'scriptMsPerSecond', AT_100);
+    const shown = pairs.find(
+      (pair) => pairKey(pair.a, pair.b) === pairKey(ranked[0]!.name, ranked[1]!.name),
+    );
+    expect(shown?.p).toBe(ranked[1]?.vsBest?.p);
+  });
+
+  it('keys a pair the same way whichever order it is named in', () => {
+    expect(pairKey('MobX', 'Redux Toolkit')).toBe(pairKey('Redux Toolkit', 'MobX'));
   });
 });
 

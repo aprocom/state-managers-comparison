@@ -40,7 +40,16 @@ export interface EquityPoint {
 }
 
 export function equityCurve(trades: Trade[], startingEquity = 0): EquityPoint[] {
-  const ordered = [...trades].sort((a, b) => a.closedAt - b.closedAt);
+  // Tie-broken by id, not left to the caller's array order. Two trades closed
+  // in the same millisecond produce different intermediate equity points
+  // depending on which is applied first, and the five implementations do not
+  // hold their trades in the same order — Redux's entity adapter keeps them
+  // newest-first, the others keep insertion order. Without the tie-break the
+  // same fixture can yield a different max drawdown in different apps, which is
+  // precisely the kind of silent divergence the cross-app suite exists to
+  // forbid.
+  const ordered = [...trades].sort((a, b) => a.closedAt - b.closedAt
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   let equity = startingEquity;
   return ordered.map((trade) => {
     equity += realizedPnl(trade);

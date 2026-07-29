@@ -160,6 +160,51 @@ export function rank(
   }));
 }
 
+export interface PairwiseComparison {
+  a: string;
+  b: string;
+  p: number;
+  delta: number;
+  magnitude: string;
+}
+
+/** Stable key for a pair, order-independent. */
+export function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * Every pairwise comparison in one cell, not just the ones the table prints.
+ *
+ * The table compares each implementation against whichever one came out best
+ * *in these same samples*. That is a selection, and correcting only the
+ * comparisons that survived the selection understates the multiplicity: under a
+ * global null the "winner" is chosen by noise, and the gap to it is the largest
+ * gap on offer. Adjusting across all ten pairs per cell — every comparison the
+ * selection could have produced — restores family-wise error control over the
+ * comparisons actually at risk, at the cost of a more conservative p-value.
+ */
+export function allPairwise(
+  report: BenchmarkReport,
+  metric: MetricKey,
+  filter: { rate: number; cpuThrottle: number },
+): PairwiseComparison[] {
+  const summaries = report.results
+    .map((result) => ({ name: result.name, summary: summariseMetric(result, metric, filter) }));
+  const pairs: PairwiseComparison[] = [];
+  for (let i = 0; i < summaries.length; i += 1) {
+    for (let j = i + 1; j < summaries.length; j += 1) {
+      const left = summaries[i]!;
+      const right = summaries[j]!;
+      const test = mannWhitney(left.summary.samples, right.summary.samples);
+      pairs.push({
+        a: left.name, b: right.name, p: test.p, delta: test.delta, magnitude: test.magnitude,
+      });
+    }
+  }
+  return pairs;
+}
+
 function formatP(p: number): string {
   if (p < 0.0001) return '<0.0001';
   if (p < 0.001) return p.toExponential(1);

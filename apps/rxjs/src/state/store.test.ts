@@ -38,6 +38,14 @@ describe('rxjs store — quotes', () => {
     expect(position?.markPrice).toBe(61000);
   });
 
+  it('advances the staleness guard even for a quote that changes nothing', () => {
+    store.applyQuote(quote({ price: 61000, seq: 5 }));
+    store.applyQuote(quote({ price: 61000, seq: 6 }));
+    store.applyQuote(quote({ price: 61000, seq: 7 }));
+    store.applyQuote(quote({ price: 1, seq: 7 }));
+    expect(btcRow()?.price).toBe(61000);
+  });
+
   it('preserves the identity of rows that did not tick', () => {
     const before = store.instrumentRows$.getValue();
     const ethBefore = before.find((row) => row.id === 'ETH-USDT');

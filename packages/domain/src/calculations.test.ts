@@ -100,6 +100,16 @@ describe('equityCurve', () => {
     ]);
   });
 
+  it('orders trades closed in the same millisecond deterministically', () => {
+    const win = trade({ id: 'b-win', closedAt: 1000, exitPrice: 200 });
+    const loss = trade({ id: 'a-loss', closedAt: 1000, exitPrice: 50 });
+    // Same set, opposite input order: the curve — and therefore the drawdown
+    // computed from it — must not depend on which array the caller held.
+    expect(equityCurve([win, loss])).toEqual(equityCurve([loss, win]));
+    expect(maxDrawdown(equityCurve([win, loss])))
+      .toBe(maxDrawdown(equityCurve([loss, win])));
+  });
+
   it('honours a starting equity', () => {
     expect(equityCurve([trade()], 100)[0]).toEqual({ ts: 1000, equity: 110 });
   });

@@ -40,6 +40,19 @@ describe('jotai atoms — quotes', () => {
     expect(btcRow()?.price).toBe(61000);
   });
 
+  // A quote that repeats the current price changes nothing on screen, and none
+  // of the five re-render for it. It must still advance the staleness guard, or
+  // a later out-of-order quote is accepted here and rejected by the other four
+  // — a divergence no parity suite would catch, because the prices agree right
+  // up to the moment they stop agreeing.
+  it('advances the staleness guard even for a quote that changes nothing', () => {
+    store.set(applyQuoteAtom, quote({ price: 61000, seq: 5 }));
+    store.set(applyQuoteAtom, quote({ price: 61000, seq: 6 }));
+    store.set(applyQuoteAtom, quote({ price: 61000, seq: 7 }));
+    store.set(applyQuoteAtom, quote({ price: 1, seq: 7 }));
+    expect(btcRow()?.price).toBe(61000);
+  });
+
   it('leaves an untouched instrument row identical', () => {
     const before = store.get(instrumentRowAtomFamily('ETH-USDT'));
     store.set(applyQuoteAtom, quote({ instrumentId: 'BTC-USDT', price: 61000, seq: 1 }));

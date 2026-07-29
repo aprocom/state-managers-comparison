@@ -9,10 +9,13 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import {
-  positionRendersPerQuoteCeiling, rank, renderMarkdownTable, rendersPerQuoteCeiling,
+  allPairwise, pairKey, positionRendersPerQuoteCeiling, rank, renderMarkdownTable,
+  rendersPerQuoteCeiling,
 } from '../packages/bench/src/results.ts';
-import { holmAdjust } from '../packages/bench/src/stats.ts';
-import type { BenchmarkReport, MetricKey } from '../packages/bench/src/results.ts';
+import { holmAdjust, median } from '../packages/bench/src/stats.ts';
+import type {
+  BenchmarkReport, MetricKey, PairwiseComparison,
+} from '../packages/bench/src/results.ts';
 
 interface RawReport extends BenchmarkReport {
   rates: number[];
@@ -83,31 +86,50 @@ const SECTIONS: Section[] = [
   },
 ];
 
-// Pass one: every comparison the report will make, so the multiplicity
-// correction can see the whole family rather than one table at a time.
-interface Cell { cpuThrottle: number; rate: number; section: Section; pValues: number[] }
+// Pass one: every pairwise comparison in every cell — not only the ones the
+// tables print — so the multiplicity correction covers the selection of the
+// winner as well as the comparisons against it.
+interface Cell {
+  cpuThrottle: number;
+  rate: number;
+  section: Section;
+  pairs: PairwiseComparison[];
+}
 const cells: Cell[] = [];
 for (const cpuThrottle of report.cpuThrottles) {
   for (const rate of report.rates) {
     for (const section of SECTIONS) {
-      const rows = rank(report, section.metric, { rate, cpuThrottle });
       cells.push({
         cpuThrottle,
         rate,
         section,
-        pValues: rows.flatMap((row) => (row.vsBest === null ? [] : [row.vsBest.p])),
+        pairs: allPairwise(report, section.metric, { rate, cpuThrottle }),
       });
     }
   }
 }
-const family = cells.flatMap((cell) => cell.pValues);
+const family = cells.flatMap((cell) => cell.pairs.map((pair) => pair.p));
 const adjustedFamily = holmAdjust(family);
 let cursor = 0;
+// Adjusted p for each pair, looked up by the two implementation names.
 const adjustedByCell = cells.map((cell) => {
-  const slice = adjustedFamily.slice(cursor, cursor + cell.pValues.length);
-  cursor += cell.pValues.length;
-  return slice;
+  const lookup = new Map<string, number>();
+  for (const pair of cell.pairs) {
+    lookup.set(pairKey(pair.a, pair.b), adjustedFamily[cursor] ?? 1);
+    cursor += 1;
+  }
+  return lookup;
 });
+
+/** The adjusted p for each non-best row, in the order the table prints them. */
+function adjustedForTable(cell: Cell, lookup: Map<string, number>): number[] {
+  const rows = rank(report, cell.section.metric, {
+    rate: cell.rate, cpuThrottle: cell.cpuThrottle,
+  });
+  const best = rows[0];
+  if (best === undefined) return [];
+  return rows.slice(1).map((row) => lookup.get(pairKey(row.name, best.name)) ?? 1);
+}
 
 const sampleCount = report.results[0]?.samples.length ?? 0;
 const perCell = sampleCount === 0
@@ -150,12 +172,21 @@ lines.push(
   + ' Mann-Whitney U test — exact where the samples are untied, which they usually are, and'
   + ' the normal approximation with a tie correction otherwise.',
   '',
-  `**The p-values are Holm-adjusted across all ${family.length} comparisons this report`
-  + ' makes.** Running this many tests at α = 0.05 and printing the raw values would be'
-  + ' expected to produce several false positives and present them as findings. Holm'
-  + ' controls the family-wise error rate without assuming the tests are independent,'
-  + ' which they are not — the same samples appear in more than one comparison.'
+  `**The p-values are Holm-adjusted across all ${family.length} pairwise comparisons these`
+  + ' samples admit** — every pair in every cell, not only the ones printed. Running this'
+  + ' many tests at α = 0.05 and printing the raw values would be expected to produce'
+  + ' several false positives and present them as findings. Holm controls the family-wise'
+  + ' error rate without assuming the tests are independent, which they are not: the same'
+  + ' samples appear in more than one comparison.'
   + ` ${survivors} of ${family.length} comparisons survive the correction.`,
+  '',
+  'The wider family is deliberate. The reference row in each table is whichever'
+  + ' implementation came out best *in these same samples*, so the comparisons shown are'
+  + ' the survivors of a selection — under a global null the winner is picked by noise and'
+  + ' the gap to it is the largest gap available. Correcting only over the printed'
+  + ' comparisons would ignore that selection. Correcting over all pairs covers every'
+  + ' comparison the selection could have produced, which is conservative in the right'
+  + ' direction.',
   '',
   "The effect column is Cliff's delta bucketed by the Romano thresholds. A row marked"
   + ' **not significant** did not survive; it should not be read as a ranking, and it is'
@@ -163,6 +194,51 @@ lines.push(
   + ' difference can be detected at all.',
   '',
 );
+
+/**
+ * Scripting time under throttling divided by scripting time unthrottled, per
+ * implementation. Throttling cannot make identical work cost less wall-clock
+ * time, so a ratio below 1 is a fact about the harness rather than about any
+ * app — this project published one once, at 0.2–0.3, caused by the throttle
+ * level sitting outside the per-implementation loop so that machine drift
+ * mapped systematically onto the condition. The check is computed here rather
+ * than asserted in prose so it cannot go stale.
+ */
+function throttleRatioText(cpuThrottle: number): string {
+  const ratios = report.results.map((result) => {
+    const at = (throttle: number) => median(result.samples
+      .filter((sample) => sample.cpuThrottle === throttle)
+      .map((sample) => sample.scriptMsPerSecond));
+    const unthrottled = at(1);
+    return {
+      name: result.name,
+      ratio: unthrottled === 0 ? Number.NaN : at(cpuThrottle) / unthrottled,
+    };
+  }).filter((entry) => Number.isFinite(entry.ratio));
+  if (ratios.length === 0) return '';
+
+  const values = ratios.map((entry) => entry.ratio);
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const range = `${low.toFixed(2)}× to ${high.toFixed(2)}×`;
+  const perApp = ratios
+    .map((entry) => `${entry.name} ${entry.ratio.toFixed(2)}×`)
+    .join(', ');
+
+  if (low < 0.95) {
+    return `**These numbers are not trustworthy.** Scripting time under ${cpuThrottle}×`
+      + ` throttling comes to ${range} of the unthrottled figure (${perApp}), and a value`
+      + ' below 1 says the same work cost less wall-clock time when the CPU was made'
+      + ' slower, which cannot happen. Something in the collection is wrong — the last'
+      + ' time this appeared it was the harness loop order, not CDP. Read the ordering'
+      + ' within this section only, and do not quote the levels.';
+  }
+  return `Nominally a mid-range phone. Scripting time comes to ${range} of the unthrottled`
+    + ` figure (${perApp}) — above 1, as it must be, since throttling cannot make the same`
+    + ' work cheaper. **The levels are still not comparable across sections**, because'
+    + ' throttling changes how much of the fixed-rate feed the page can keep up with;'
+    + ' compare the ordering within a section, not the magnitudes between them.';
+}
 
 for (const [index, cell] of cells.entries()) {
   const previous = cells[index - 1];
@@ -172,15 +248,7 @@ for (const [index, cell] of cells.entries()) {
       '',
       cell.cpuThrottle === 1
         ? 'An unthrottled desktop — where almost every published comparison stops.'
-        : 'Nominally a mid-range phone. **Do not compare these absolute numbers with the 1×'
-          + ' section.** Both conditions provably do the same work — the same quotes'
-          + ' delivered, the same row renders, the same 60 FPS — and yet CDP reports'
-          + ' roughly half the scripting time under throttling. Throttling cannot make the'
-          + ' same work cost less, so something about how these counters are collected'
-          + ' under `Emulation.setCPUThrottlingRate` is wrong, and this project has not'
-          + ' worked out what. The ordering within this section is measured the same way'
-          + ' for all five and is comparable; the levels are not comparable across'
-          + ' sections.',
+        : throttleRatioText(cell.cpuThrottle),
       '',
     );
   }
@@ -211,7 +279,7 @@ for (const [index, cell] of cells.entries()) {
     }, {
       digits: cell.section.digits,
       unit: cell.section.unit,
-      adjustedP: adjustedByCell[index] ?? [],
+      adjustedP: adjustedForTable(cell, adjustedByCell[index] ?? new Map()),
     }),
     '',
   );

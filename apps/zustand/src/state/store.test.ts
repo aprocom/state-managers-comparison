@@ -32,6 +32,14 @@ describe('app store — quotes', () => {
     expect(store.getState().prices['BTC-USDT']).toBe(61000);
   });
 
+  it('advances the staleness guard even for a quote that changes nothing', () => {
+    store.getState().applyQuote(quote({ price: 61000, seq: 5 }));
+    store.getState().applyQuote(quote({ price: 61000, seq: 6 }));
+    store.getState().applyQuote(quote({ price: 61000, seq: 7 }));
+    store.getState().applyQuote(quote({ price: 1, seq: 7 }));
+    expect(store.getState().prices['BTC-USDT']).toBe(61000);
+  });
+
   it('leaves unrelated instruments untouched', () => {
     store.getState().applyQuote(quote({ instrumentId: 'ETH-USDT', price: 3100 }));
     const before = store.getState().prices;

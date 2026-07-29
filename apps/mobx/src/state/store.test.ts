@@ -35,6 +35,14 @@ describe('mobx store — quotes', () => {
     expect(btcRow()?.price).toBe(61000);
   });
 
+  it('advances the staleness guard even for a quote that changes nothing', () => {
+    store.applyQuote(quote({ price: 61000, seq: 5 }));
+    store.applyQuote(quote({ price: 61000, seq: 6 }));
+    store.applyQuote(quote({ price: 61000, seq: 7 }));
+    store.applyQuote(quote({ price: 1, seq: 7 }));
+    expect(btcRow()?.price).toBe(61000);
+  });
+
   it('opens with seeded positions and trades', () => {
     expect(store.positionRows.length).toBeGreaterThan(0);
     expect(store.journalStats.tradeCount).toBe(20);

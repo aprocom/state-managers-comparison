@@ -29,7 +29,6 @@ const INSTRUMENT_BY_ID = new Map(INSTRUMENTS.map((instrument) => [instrument.id,
 interface PriceCell {
   price: number;
   direction: PriceDirection;
-  seq: number;
 }
 
 /**
@@ -40,8 +39,19 @@ interface PriceCell {
 export const priceAtomFamily = atomFamily((id: InstrumentId) => atom<PriceCell>({
   price: START_PRICES[id] ?? 0,
   direction: 'flat',
-  seq: 0,
 }));
+
+/**
+ * The last sequence number seen per instrument, deliberately in its own atom.
+ *
+ * It used to live inside the price cell, which forced a choice between two
+ * wrong behaviours: write the cell on every quote and re-render a row for a
+ * quote that changed nothing, or skip the write and leave the sequence number
+ * behind, so a quote the other four implementations reject as stale would be
+ * accepted here. Splitting the atom removes the choice — the guard advances on
+ * every quote, and the cell only changes when the rendered value does.
+ */
+export const seqAtomFamily = atomFamily((_id: InstrumentId) => atom(0));
 
 /** One boolean atom per instrument, so pinning one does not invalidate the
  *  other forty-nine rows. */
@@ -76,19 +86,20 @@ export const pinnedCountAtom = atom((get) => INSTRUMENTS
   .reduce((count, instrument) => count + (get(pinnedAtomFamily(instrument.id)) ? 1 : 0), 0));
 
 export const applyQuoteAtom = atom(null, (get, set, quote: Quote) => {
+  const seqAtom = seqAtomFamily(quote.instrumentId);
+  if (quote.seq <= get(seqAtom)) return;
+  set(seqAtom, quote.seq);
+
   const cellAtom = priceAtomFamily(quote.instrumentId);
   const cell = get(cellAtom);
-  if (quote.seq <= cell.seq) return;
   const direction = nextDirection(cell.price, quote.price);
-  if (quote.price === cell.price && cell.direction === direction) {
-    // Deliberately not writing. Writing a new cell object here — which this
-    // did — invalidates the row atom and re-renders one row for a quote that
-    // changed nothing, where the other four render none. The sequence number
-    // is only used to reject stale quotes, and a quote that changes nothing
-    // cannot be usefully stale.
-    return;
-  }
-  set(cellAtom, { price: quote.price, direction, seq: quote.seq });
+  // Deliberately not writing when nothing rendered would change. Writing a new
+  // cell object invalidates the row atom and re-renders one row for a quote
+  // that moved nothing — where MobX's observables, Immer's set trap and the
+  // other two implementations' identity caches all decline to. The guard above
+  // has already recorded the sequence number, so this cannot swallow it.
+  if (quote.price === cell.price && cell.direction === direction) return;
+  set(cellAtom, { price: quote.price, direction });
 });
 
 // --- Base state -------------------------------------------------------------
