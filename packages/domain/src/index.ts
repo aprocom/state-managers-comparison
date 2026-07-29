@@ -7,3 +7,4 @@ export * from './instruments';
 export * from './calculations';
 export * from './alerts';
 export * from './fixtures';
+export * from './quoteCounter';

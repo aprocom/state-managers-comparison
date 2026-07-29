@@ -1,15 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { median, renderMarkdownTable, summarise } from './results';
+import {
+  median, rank, renderMarkdownTable, rendersPerQuoteCeiling, summariseMetric,
+} from './results';
 import type { BenchmarkReport, RunSample } from './results';
 
 function sample(overrides: Partial<RunSample>): RunSample {
   return {
-    rate: 100, repeat: 0, elapsedMs: 6000,
-    instrumentRowRenders: 600, positionRowRenders: 60, rendersPerQuote: 1,
-    fps: 60, longTaskCount: 0, longTaskMs: 0, heapBytes: 10 * 1024 * 1024,
+    rate: 100,
+    repeat: 0,
+    cpuThrottle: 1,
+    elapsedMs: 6000,
+    quotesDelivered: 600,
+    instrumentRowRenders: 600,
+    positionRowRenders: 72,
+    rendersPerQuote: 1,
+    positionRendersPerQuote: 1,
+    fps: 60,
+    frameP99Ms: 16.7,
+    droppedFrames: 0,
+    longTaskCount: 0,
+    longTaskMs: 0,
+    totalBlockingMs: 0,
+    interactionCount: 8,
+    interactionWorstMs: 24,
+    interactionP75Ms: 16,
+    scriptMsPerSecond: 20,
+    recalcStyleMsPerSecond: 2,
+    layoutMsPerSecond: 9,
+    taskMsPerSecond: 50,
     ...overrides,
   };
 }
+
+const AT_100 = { rate: 100, cpuThrottle: 1 };
 
 describe('median', () => {
   it('is the middle value for an odd count', () => {
@@ -25,55 +48,127 @@ describe('median', () => {
   });
 });
 
-describe('summarise', () => {
+describe('rendersPerQuoteCeiling', () => {
+  it('is 50 at 10 updates/sec — the metric can see a fully broken implementation', () => {
+    expect(rendersPerQuoteCeiling(10)).toBe(50);
+  });
+
+  it('is 10 at 100 updates/sec', () => {
+    expect(rendersPerQuoteCeiling(100)).toBe(10);
+  });
+
+  it('is 1.00 at 1000 updates/sec — optimal and broken score the same', () => {
+    expect(rendersPerQuoteCeiling(1000)).toBe(1);
+  });
+
+  it('drops below 1 above 1000, so higher rates do not restore range', () => {
+    expect(rendersPerQuoteCeiling(2000)).toBeLessThan(1);
+  });
+});
+
+describe('summariseMetric', () => {
   it('ignores samples taken at other rates', () => {
     const result = {
       name: 'x',
       samples: [
-        sample({ rate: 10, rendersPerQuote: 99 }),
-        sample({ rate: 100, rendersPerQuote: 2 }),
+        sample({ rate: 10, scriptMsPerSecond: 99 }),
+        sample({ rate: 100, scriptMsPerSecond: 2 }),
       ],
     };
-    expect(summarise(result, 100).rendersPerQuote).toBe(2);
+    expect(summariseMetric(result, 'scriptMsPerSecond', AT_100).value).toBe(2);
+  });
+
+  it('ignores samples taken at another throttle level', () => {
+    const result = {
+      name: 'x',
+      samples: [
+        sample({ cpuThrottle: 4, scriptMsPerSecond: 99 }),
+        sample({ cpuThrottle: 1, scriptMsPerSecond: 3 }),
+      ],
+    };
+    expect(summariseMetric(result, 'scriptMsPerSecond', AT_100).value).toBe(3);
   });
 
   it('takes the median across repeats, so one slow run cannot dominate', () => {
     const result = {
       name: 'x',
       samples: [
-        sample({ repeat: 0, longTaskMs: 10 }),
-        sample({ repeat: 1, longTaskMs: 12 }),
-        sample({ repeat: 2, longTaskMs: 900 }),
+        sample({ scriptMsPerSecond: 10 }),
+        sample({ scriptMsPerSecond: 11 }),
+        sample({ scriptMsPerSecond: 400 }),
       ],
     };
-    expect(summarise(result, 100).longTaskMs).toBe(12);
+    expect(summariseMetric(result, 'scriptMsPerSecond', AT_100).value).toBe(11);
   });
 
-  it('converts heap bytes to megabytes', () => {
-    const result = { name: 'x', samples: [sample({ heapBytes: 20 * 1024 * 1024 })] };
-    expect(summarise(result, 100).heapMb).toBe(20);
+  it('carries a confidence interval, not just a point', () => {
+    const result = {
+      name: 'x',
+      samples: [10, 12, 11, 40, 13].map((v) => sample({ scriptMsPerSecond: v })),
+    };
+    const summary = summariseMetric(result, 'scriptMsPerSecond', AT_100);
+    expect(summary.ci.high).toBeGreaterThan(summary.ci.low);
+  });
+});
+
+function report(byName: Record<string, number[]>): BenchmarkReport {
+  return {
+    soakMs: 6000,
+    repeats: 5,
+    results: Object.entries(byName).map(([name, values]) => ({
+      name,
+      samples: values.map((v) => sample({ scriptMsPerSecond: v })),
+    })),
+  };
+}
+
+describe('rank', () => {
+  it('puts the lowest median first when lower is better', () => {
+    const ranked = rank(
+      report({ slow: [50, 51, 52], fast: [10, 11, 12] }), 'scriptMsPerSecond', AT_100,
+    );
+    expect(ranked.map((r) => r.name)).toEqual(['fast', 'slow']);
+  });
+
+  it('does not test the best against itself', () => {
+    const ranked = rank(report({ a: [1, 2, 3], b: [4, 5, 6] }), 'scriptMsPerSecond', AT_100);
+    expect(ranked[0]?.vsBest).toBeNull();
+  });
+
+  it('flags a clearly separated implementation as significantly worse', () => {
+    const ranked = rank(
+      report({ fast: [10, 10, 11, 11, 12, 12], slow: [90, 91, 92, 93, 94, 95] }),
+      'scriptMsPerSecond', AT_100,
+    );
+    expect(ranked[1]?.vsBest?.p).toBeLessThan(0.05);
+    expect(ranked[1]?.vsBest?.magnitude).toBe('large');
+  });
+
+  it('does not claim significance for overlapping samples', () => {
+    const ranked = rank(
+      report({ a: [10, 12, 11, 13, 12, 11], b: [11, 13, 12, 12, 13, 10] }),
+      'scriptMsPerSecond', AT_100,
+    );
+    expect(ranked[1]?.vsBest?.p).toBeGreaterThan(0.05);
   });
 });
 
 describe('renderMarkdownTable', () => {
-  const report: BenchmarkReport = {
-    soakMs: 6000,
-    repeats: 1,
-    results: [
-      { name: 'slow', samples: [sample({ rendersPerQuote: 50 })] },
-      { name: 'fast', samples: [sample({ rendersPerQuote: 1 })] },
-    ],
-  };
-
-  it('orders implementations by renders per quote, best first', () => {
-    const lines = renderMarkdownTable(report, 100).split('\n');
-    expect(lines[2]).toContain('fast');
-    expect(lines[3]).toContain('slow');
+  it('marks a non-significant runner-up as such rather than implying a win', () => {
+    const table = renderMarkdownTable(
+      report({ a: [10, 12, 11, 13, 12, 11], b: [11, 13, 12, 12, 13, 10] }),
+      'scriptMsPerSecond', AT_100,
+    );
+    expect(table).toContain('not significant');
+    expect(table).toContain('best');
   });
 
-  it('emits a well-formed markdown table', () => {
-    const lines = renderMarkdownTable(report, 100).split('\n');
-    expect(lines[0]?.startsWith('|')).toBe(true);
-    expect(lines[1]).toContain('---');
+  it('prints a confidence interval for every row', () => {
+    const table = renderMarkdownTable(
+      report({ a: [10, 12, 11], b: [40, 42, 41] }), 'scriptMsPerSecond', AT_100,
+    );
+    for (const line of table.split('\n').slice(2)) {
+      expect(line).toMatch(/\[\d+\.\d+–\d+\.\d+\]/);
+    }
   });
 });

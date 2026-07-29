@@ -1,4 +1,5 @@
 import { mulberry32 } from './random';
+import { countQuotes } from './quoteCounter';
 import type { Instrument, InstrumentId, Quote } from './types';
 
 export interface FeedOptions {
@@ -62,6 +63,7 @@ export function createFeed(options: FeedOptions): Feed {
   }
 
   function emit(count: number, now: number): void {
+    countQuotes(count);
     for (let n = 0; n < count; n += 1) {
       const quote = nextQuote(now);
       for (const listener of listeners) {

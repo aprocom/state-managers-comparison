@@ -95,8 +95,8 @@ test('all five implementations produce identical derived state', async ({ page }
   // A vector of empty strings would make every app trivially equal, so assert
   // the reference actually read something before comparing anything to it.
   expect(reference.vector['all.tradeCount']).toBe('250');
-  expect(reference.vector['alerts'].length).toBeGreaterThan(0);
-  expect(reference.vector['rows.first20'].split('\n')).toHaveLength(20);
+  expect(reference.vector['alerts'] ?? '').not.toBe('');
+  expect((reference.vector['rows.first20'] ?? '').split('\n')).toHaveLength(20);
 
   for (const { name, vector } of rest) {
     for (const key of Object.keys(reference.vector)) {
