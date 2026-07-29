@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Functional parity
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # Benchmarks are deliberately NOT a gate. A shared CI runner has neither the
+  # thermal nor the scheduling stability to make a 60 FPS threshold meaningful,
+  # and a flaky perf gate teaches people to ignore red builds. Results are
+  # published as an artifact; the numbers in the README come from a documented
+  # local run.
+  benchmark:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build:apps
+      - run: npx playwright test e2e/benchmark.spec.ts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench-results/
+          retention-days: 30
