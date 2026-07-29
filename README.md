@@ -40,16 +40,36 @@ No backend, no network, no auth. The quote feed is a seeded generator and the tr
 
 **Maintenance cost** — measured by experiment rather than opinion. Once all five implementations are frozen at a tag, the same new feature is added to each one and the diff size, files touched, and amount of working code that had to change are recorded.
 
+## First results
+
+All five implementations pass the same 40 functional parity tests unchanged, so these numbers describe apps that genuinely do the same thing.
+
+| | Bundle (gzip) | State-layer LOC | Files | Row identity preserved by |
+|---|---:|---:|---:|---|
+| **Jotai** | 68.8 kB | 183 | 2 | the atom graph |
+| **MobX** | 82.4 kB | 229 | 1 | per-instrument computeds |
+| **Redux Toolkit** | 73.9 kB | 264 | 3 | a hand-written cache |
+| **Zustand** | 64.8 kB | 275 | 3 | a hand-written cache |
+| **RxJS** | 71.6 kB | 304 | 2 | `scan`, incrementally |
+
+Bundle size and the amount of code needed pull in opposite directions. Zustand ships the smallest bundle and needs the most code around it; MobX ships the largest and needs the least. Neither is a verdict — they are different budgets.
+
+The sharpest single finding so far concerns **firing an alert exactly once per transition**:
+
+- **MobX** — a `reaction` over a computed. The dependency graph decides when to run.
+- **RxJS** — a `scan` that carries the previous key set. The diff is an operator, not bookkeeping.
+- **Zustand, Jotai, Redux** — all three need a hand-maintained `Set` of already-fired keys. The derivation is cheap in Jotai and Redux; it is the *notification* that none of them model.
+
+And on keeping row identity stable so one tick re-renders one row instead of fifty: MobX and Jotai get it from their dependency graphs, RxJS gets it from incremental `scan`, while Zustand and Redux both need an explicit per-row cache written by hand. In Zustand's case that is compounded by `useSyncExternalStore` demanding a stable reference from every selector, which is why its state layer is the second largest despite the smallest bundle.
+
 ## Status
 
-This is built in the open, one plan at a time.
+- [x] **Foundation** — monorepo, shared domain package, shared component library, parity suite
+- [x] **All five implementations** — 121 unit tests, 40 parity tests, `tsc --strict` clean
+- [ ] **Runtime benchmarks** — tick-to-paint latency, re-render counts, long tasks, memory
+- [ ] **Change-cost experiment, CI, live demo**
 
-- [x] **Foundation** — monorepo, shared domain package (52 unit tests), shared component library, functional parity suite
-- [x] **Zustand** — reference implementation, both screens, alert engine
-- [ ] **RxJS, Redux Toolkit, MobX, Jotai**
-- [ ] **Benchmark harness, CI, live demo, results**
-
-No benchmark numbers are published yet. They will appear here generated from the benchmark's JSON output, not typed in by hand.
+Runtime performance numbers are not published yet, and nothing above is one. Bundle size and LOC are measured from the build and the source; latency and re-render counts need the harness that comes next, and they will be generated from its JSON output rather than typed in by hand.
 
 ## Design and plans
 

@@ -1,0 +1,24 @@
+{
+  "name": "@smc/app-redux",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4177"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.5.0",
+    "@smc/domain": "*",
+    "@smc/ui": "*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-redux": "^9.2.0",
+    "reselect": "^5.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.2.0",
+    "vite": "^7.0.0"
+  }
+}
