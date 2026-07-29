@@ -13,6 +13,7 @@ export const TESTID = {
 
   instrumentRow: (id: string) => `instrument-row-${id}`,
   instrumentPrice: (id: string) => `instrument-price-${id}`,
+  instrumentPin: (id: string) => `instrument-pin-${id}`,
 
   positionRow: (id: string) => `position-row-${id}`,
   positionPnl: (id: string) => `position-pnl-${id}`,
@@ -20,6 +21,7 @@ export const TESTID = {
   accountPnl: 'account-pnl',
   accountRisk: 'account-risk',
   accountDrawdown: 'account-drawdown',
+  accountPinned: 'account-pinned',
 
   alert: (kind: AlertKind) => `alert-${kind}`,
   alertList: 'alert-list',

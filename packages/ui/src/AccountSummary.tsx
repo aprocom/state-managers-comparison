@@ -1,7 +1,9 @@
 import { formatSignedMoney } from './format';
 import { TESTID } from './testids';
 
-export function AccountSummary(props: { totalPnl: number; usedRisk: number; drawdown: number }) {
+export function AccountSummary(
+  props: { totalPnl: number; usedRisk: number; drawdown: number; pinnedCount: number },
+) {
   return (
     <div className="summary">
       <div className="summary__item">
@@ -20,6 +22,12 @@ export function AccountSummary(props: { totalPnl: number; usedRisk: number; draw
         <span className="summary__label">Drawdown</span>
         <span data-testid={TESTID.accountDrawdown} className="summary__value">
           {formatSignedMoney(props.drawdown)}
+        </span>
+      </div>
+      <div className="summary__item">
+        <span className="summary__label">Pinned</span>
+        <span data-testid={TESTID.accountPinned} className="summary__value">
+          {props.pinnedCount}
         </span>
       </div>
     </div>
