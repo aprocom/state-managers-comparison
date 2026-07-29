@@ -115,7 +115,7 @@ Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrott
 | **Jotai** | 87.5 [85.3–89.7] | 0.0016 | large |
 | **Redux Toolkit** | 89.2 [81.0–90.4] | 0.0016 | large |
 
-A 2.4× spread between the cheapest and the most expensive, on identical work, verified identical by the cross-app suite. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**.
+A 2.4× spread between the cheapest and the most expensive, on identical work, verified identical by the cross-app suite. The ordering replicates under CPU throttling, with Jotai and Redux — whose intervals overlap — swapping the bottom two places. Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `a84ad60`, which is recorded in the results file; nothing under `apps/` or `packages/` has changed since, so the numbers describe the tree you are reading.
 
 **Read this ranking knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. All five now do the same work per quote. But this is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
 
