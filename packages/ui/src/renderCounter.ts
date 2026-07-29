@@ -11,7 +11,6 @@ interface RenderCounts {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __SMC_RENDERS__: RenderCounts | undefined;
 }
 

@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Feed } from '@smc/domain';
-import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
+import { INITIAL_FEED_RATE, AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import type { InstrumentId } from '@smc/domain';
 import { appStore } from '../state/store';
 import { useBehavior } from '../state/useBehavior';
@@ -20,6 +20,12 @@ export function TerminalScreen() {
   const alerts = useBehavior(appStore.alerts$);
   const selectedId = useBehavior(appStore.selectedInstrumentId$);
   const pinnedCount = useBehavior(appStore.pinnedCount$);
+  const [firedCount, setFiredCount] = useState(0);
+
+  useEffect(
+    () => appStore.onAlertFired(() => { setFiredCount((count) => count + 1); }),
+    [],
+  );
 
   const feedRef = useRef<Feed | null>(null);
 
@@ -31,7 +37,7 @@ export function TerminalScreen() {
     const feed = createFeed({
       instruments: INSTRUMENTS,
       seed: 20260729,
-      updatesPerSecond: feedRate,
+      updatesPerSecond: INITIAL_FEED_RATE,
       startPrices: START_PRICES,
     });
     feedRef.current = feed;
@@ -50,7 +56,7 @@ export function TerminalScreen() {
 
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
-      <AlertList alerts={alerts} />
+      <AlertList alerts={alerts} firedCount={firedCount} />
       <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
       <InstrumentTable

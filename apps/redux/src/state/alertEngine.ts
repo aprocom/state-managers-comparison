@@ -1,6 +1,6 @@
 import type { Alert } from '@smc/domain';
 import type { AppStore, RootState } from './slice';
-import { selectAlerts } from './selectors';
+import { selectAlerts, selectHeldInstrumentIds } from './selectors';
 
 function alertKey(alert: Alert): string {
   return `${alert.kind}:${alert.subjectId}`;
@@ -43,12 +43,16 @@ export function attachAlertEngine(
 
   evaluate();
   return store.listeners.startListening({
+    // Compare the held prices, not the `prices` object: Immer produces a new
+    // object on every quote, so an identity check on it never short-circuits.
+    // The earlier version of this predicate returned true for 100% of quotes
+    // while its comment claimed it filtered them.
     predicate: (_action, current, previous) => {
       const next = (current as RootState).app;
       const before = (previous as RootState).app;
-      return next.prices !== before.prices
-        || next.positions !== before.positions
-        || next.trades !== before.trades;
+      if (next.positions !== before.positions || next.trades !== before.trades) return true;
+      return selectHeldInstrumentIds(current as RootState)
+        .some((id) => next.prices[id] !== before.prices[id]);
     },
     effect: () => { evaluate(); },
   });

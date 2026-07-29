@@ -55,7 +55,7 @@ No backend, no network, no auth. The quote feed is a seeded generator, the trade
 
 Stated in full, because in this genre the methodology *is* the contribution.
 
-**Parity first.** Two suites gate the benchmark. `parity.spec.ts` drives all five apps through the same ten functional tests via a shared `data-testid` contract. `cross-app-parity.spec.ts` reads an exact value vector from every implementation — closed-trade statistics under three filters, the first twenty journal rows cell by cell, risk and drawdown totals, the alert key set — and requires all five to be **identical**, not merely individually plausible. Benchmarking apps that behave differently would be meaningless, and the first version of this project did exactly that for weeks without noticing.
+**Parity first.** Two suites gate the benchmark. `parity.spec.ts` drives all five apps through the same ten functional tests via a shared `data-testid` contract. `cross-app-parity.spec.ts` reads an exact value vector from every implementation — closed-trade statistics under three filters, the first twenty journal rows cell by cell, risk and drawdown totals, the alert key set — and requires all five to be **identical**, not merely individually plausible. Benchmarking apps that behave differently would be meaningless, and the first version of this project did exactly that without noticing.
 
 **Production builds.** `vite preview` over `vite build` output, React 19 production. StrictMode is on in all five, which does not double-render outside development.
 
@@ -101,7 +101,9 @@ The fix was a per-position `computed` in MobX and a `positionRowAtomFamily` in J
 
 ### Main-thread CPU
 
-This is where the five differ, and it is the axis the render-count metric hid completely. See [bench-results/report.md](bench-results/report.md) for the full tables with intervals and p-values.
+This is the only axis on which the five separate, and it is the one the render-count metric hid completely. Full tables with confidence intervals and Holm-adjusted p-values: **[bench-results/report.md](bench-results/report.md)**.
+
+Read the numbers with this in mind: an earlier version of them was substantially an artifact. Three of the five recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of quotes, because of where the expensive invariant sat in each derivation graph — nothing to do with the libraries. That is fixed, all five now do the same work per quote, and the parity suites hold. But it is the second time this project produced a confident performance ranking that turned out to be measuring its own code, and a third has to be considered live until someone else has looked.
 
 ### Interaction latency, frame pacing, blocking time
 
@@ -113,11 +115,11 @@ Regenerate with `npm run metrics`.
 
 | | Bundle (gzip) | State-layer SLOC | Files | Wiring SLOC outside the state layer |
 |---|---:|---:|---:|---:|
-| **Jotai** | 68.9 kB | 198 | 2 | 131 |
-| **MobX** | 82.9 kB | 262 | 1 | 106 |
-| **Zustand** | 65.7 kB | 289 | 3 | 120 |
-| **Redux Toolkit** | 77.9 kB | 307 | 3 | 146 |
-| **RxJS** | 72.1 kB | 332 | 2 | 113 |
+| **Jotai** | 69.1 kB | 197 | 2 | 131 |
+| **MobX** | 83.1 kB | 266 | 1 | 106 |
+| **Zustand** | 65.9 kB | 299 | 3 | 124 |
+| **Redux Toolkit** | 78.1 kB | 316 | 3 | 147 |
+| **RxJS** | 72.6 kB | 344 | 2 | 118 |
 
 SLOC is non-blank, non-comment lines, so an implementation is not penalised for explaining itself. Bundle size is gzip -9 of the emitted JS and includes React and the shared packages in every figure — only the *deltas* between rows are library cost. The wiring column is counted separately on purpose: excluding it entirely flatters whichever library pushes work into the screens, and folding it in flatters whichever pushes it into the store.
 
@@ -125,7 +127,7 @@ SLOC is non-blank, non-comment lines, so an implementation is not penalised for 
 
 The axis nobody publishes. All five were frozen at a tag, the **same** feature was added to each, and the diff was measured. The feature: pin an instrument, pinned rows sort to the top of the table keeping their relative order, a pinned count appears in the account summary, and pins survive a screen switch. It was chosen because it needs new state, a new action, a re-ordering of an existing derivation that must not break row identity, and a new cross-cutting aggregate — not because any library handles it especially well.
 
-The shared half of the change (the pin button, the row model field, the testids, the parity tests) is identical for all five and excluded. Regenerate with `git diff --shortstat before-pin-feature -- apps/<name>`.
+The shared half of the change (the pin button, the row model field, the testids, the parity tests) is identical for all five and excluded. Regenerate with `git diff --shortstat before-pin-feature after-pin-feature -- apps/<name>` — both tags, not tag-to-HEAD, or you measure everything that happened since as well.
 
 | | Files touched | Lines added | Lines of working code modified | State-layer diff |
 |---|---:|---:|---:|---:|
@@ -147,9 +149,9 @@ One measurement, one feature, one author. It is a data point, not a law; a featu
 
 More useful than either table above, because it is what you pay every time someone new touches the code.
 
-*Keeping row identity stable.* MobX gets it from per-instrument and per-position computeds, Jotai from atom families, RxJS from incremental `scan`. Zustand and Redux each need an explicit per-row cache, written and maintained by hand. **But** — see the bug above — MobX and Jotai only get it where you built the graph at that granularity, and getting that wrong is silent. The hand-written cache is more code and more obvious; the graph is less code and fails quietly.
+*Keeping row identity stable.* MobX gets it from per-instrument and per-position computeds, Jotai from atom families. RxJS gets it from incremental `scan` **for the instrument table only** — position rows come from `combineLatest` and need the same hand-written per-row cache Zustand and Redux use, which is visible at `apps/rxjs/src/state/store.ts` and is the honest version of a claim this README previously overstated. And per the bug above, MobX and Jotai only get it where the graph was built at that granularity; getting that wrong is silent. The hand-written cache is more code and more obvious. The graph is less code and fails quietly.
 
-*Firing an alert exactly once per transition.* MobX expresses it as a `reaction` over a computed, RxJS as a `scan` carrying the previous key set. Zustand, Jotai and Redux each need a hand-maintained `Set` of already-fired keys. Redux's listener middleware notifies per *action*, not per transition of the derived value, so it does not remove the bookkeeping — it only removes the decision of when to re-evaluate.
+*Firing an alert exactly once per transition.* **All five keep a set of already-fired keys.** That is worth stating plainly because this README used to claim otherwise. What differs is where the set lives and what maintains it: RxJS carries it through a `scan`, so it is part of the pipeline and cannot drift out of sync with the stream; the other four hold it in a closure that something has to remember to reset. MobX's `reaction` and Redux's listener middleware decide *when* to re-evaluate — real work, and a real difference — but neither removes the key set. A library that gave you fire-once-per-transition over a derived collection for free would be a genuine differentiator, and none of these five does.
 
 *Deciding when to re-evaluate at all.* MobX and Jotai get this from the dependency graph. Zustand has `subscribeWithSelector` and Redux has the listener middleware's `predicate`; both are one-liners, and both were absent from the first version of this project, which is why three implementations were re-running a 250-element sort on every quote while two were not. That asymmetry was invisible to a metric that counts renders.
 
@@ -175,7 +177,7 @@ The limitations, at the same level of detail as the results. This section exists
 
 **Five samples per cell.** Enough to compute an interval and run a rank test, not enough to detect a small effect. Where the test says "not significant", the honest reading is *this study did not detect a difference*, not *there is none*.
 
-**The change-cost result is one feature, measured once, by the person who wrote all five implementations.** A differently shaped feature would rank them differently, and I had already spent weeks inside each codebase. Treat it as a data point, not a law.
+**The change-cost result is one feature, measured once, by the person who wrote all five implementations.** A differently shaped feature would rank them differently, and the author knew every codebase intimately before starting the clock. One measurement is a data point, not a law.
 
 **I am not a neutral party.** I wrote all five implementations. The defence against that is the cross-app parity suite, the fact that each library is used the way its own docs prescribe, and that every bug found in my own favour is documented above rather than quietly fixed.
 
@@ -192,8 +194,11 @@ Kept because they are more instructive than the results, and because they are al
 5. **The test written to the bug.** RxJS subscribed its alert-notification stream at construction, so the initial alert set was consumed by an empty listener list and no listener ever received anything. The test that should have caught it asserted `toHaveLength(0)` where the other four asserted `1` — written to match the observed behaviour rather than the requirement.
 6. **The sequence reset.** Changing the feed rate rebuilt the feed, restarting its per-instrument sequence counter while the stores still held the last sequence they had seen. Every store's staleness guard then silently dropped the next N quotes per instrument — 120 of them at 1000/s. The parity test named *"changes tick rate without breaking the stream"* passed throughout.
 7. **The drifting clock.** Positions were seeded from a fixed date while alerts evaluated against a live `Date.now()`, so the alert set grew with the calendar: two alerts on the fixture date, five a year later. The README claimed every run reproduced exactly.
+8. **The asymmetry that faked the headline result.** `maxDrawdown(equityCurve(trades))` — a copy, sort and scan over 250 trades — sat inside a derivation that a price change invalidates. In Zustand, Redux and RxJS that put it on the hot path a thousand times a second; MobX and Jotai read prices per held instrument, so they paid it on 12% of quotes. **A large part of the CPU gap this project was about to publish as a difference between libraries was a difference between my derivation graphs.** Compounding it: the `subscribeWithSelector` and listener-middleware guards meant to stop the alert engine re-evaluating compared the identity of the `prices` object, which is rebuilt on every quote, so they never once short-circuited — while the comment above each of them claimed they did.
+9. **The alert panel that could never clear.** MobX and Jotai rendered the alert list from the `onFire` callback. `onFire` runs for newly triggered alerts only, so nothing fires on the way out and a cleared alert stayed on screen forever — in the feature the README calls the sharpest part of the comparison, and in the two implementations whose fine-grained reactivity is supposed to make exactly this easy.
+10. **Four vacuous tests.** "Stops firing once detached" detached the engine, applied a quote that could not move any rule past its threshold, and asserted nothing fired. Replacing `detach()` with a no-op left all four passing. The alert engine's reactivity was untested in four of five implementations.
 
-Every one of these was found by attacking the project's own conclusions after they looked good. Numbers 3 through 7 were found *after* the first version was written up as finished.
+Numbers 1, 2 and 6 I found myself. **Numbers 3 through 5 and 7 through 10 were found by adversarial review after the project had been written up as finished — twice.** That ratio is the honest headline of this section: attacking your own work catches some of it, and having something else attack it catches the rest.
 
 ---
 

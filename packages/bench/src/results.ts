@@ -16,6 +16,8 @@ export interface RunSample {
 
   elapsedMs: number;
   quotesDelivered: number;
+  /** Quotes that landed on an instrument backing an open position. */
+  heldInstrumentQuotes: number;
 
   instrumentRowRenders: number;
   positionRowRenders: number;
@@ -143,22 +145,40 @@ export function rank(
   }));
 }
 
+function formatP(p: number): string {
+  if (p < 0.0001) return '<0.0001';
+  if (p < 0.001) return p.toExponential(1);
+  return p.toFixed(4);
+}
+
+/**
+ * Render one table. `adjustedP` carries the Holm-adjusted value for each
+ * non-best row, in row order, when the caller has computed it across the whole
+ * family of comparisons the report makes — which it should, because a report
+ * that runs a hundred tests at alpha = 0.05 expects several false positives and
+ * would otherwise print them as findings. The verdict column reads from the
+ * adjusted value when it is supplied.
+ */
 export function renderMarkdownTable(
   report: BenchmarkReport,
   metric: MetricKey,
   filter: { rate: number; cpuThrottle: number },
-  { lowerIsBetter = true, digits = 1, unit = '' } = {},
+  { lowerIsBetter = true, digits = 1, unit = '', adjustedP = [] as number[] } = {},
 ): string {
   const rows = rank(report, metric, filter, lowerIsBetter);
+  const hasAdjusted = adjustedP.length > 0;
   const header = `| | ${metric}${unit === '' ? '' : ` (${unit})`}, median [95% CI] `
-    + '| vs. best (p) | effect |\n|---|---:|---:|---|';
+    + `| p${hasAdjusted ? ' (Holm-adjusted)' : ''} | effect |\n|---|---:|---:|---|`;
+  let comparisonIndex = 0;
   const body = rows
     .map(({ name, summary, vsBest }) => {
       const cell = formatWithCi(summary.value, summary.ci, digits);
       if (vsBest === null) return `| **${name}** | ${cell} | — | best |`;
-      const p = vsBest.p < 0.001 ? '<0.001' : vsBest.p.toFixed(3);
-      const verdict = vsBest.p < 0.05 ? vsBest.magnitude : 'not significant';
-      return `| **${name}** | ${cell} | ${p} | ${verdict} |`;
+      const adjusted = adjustedP[comparisonIndex];
+      comparisonIndex += 1;
+      const shown = adjusted ?? vsBest.p;
+      const verdict = shown < 0.05 ? vsBest.magnitude : 'not significant';
+      return `| **${name}** | ${cell} | ${formatP(shown)} | ${verdict} |`;
     })
     .join('\n');
   return `${header}\n${body}`;

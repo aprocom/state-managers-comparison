@@ -71,6 +71,8 @@ export interface ComparisonResult {
   delta: number;
   /** Thresholds from Romano et al.: <0.147 negligible, <0.33 small, <0.474 medium. */
   magnitude: 'negligible' | 'small' | 'medium' | 'large';
+  /** Which null distribution produced `p`. */
+  method: 'exact' | 'normal';
 }
 
 function erf(x: number): number {
@@ -95,6 +97,62 @@ export function cliffsDelta(a: number[], b: number[]): number {
   return (greater - less) / (a.length * b.length);
 }
 
+/**
+ * Exact null distribution of the Mann-Whitney U by dynamic programming.
+ * `counts[u]` is the number of the C(n1+n2, n1) arrangements giving that U.
+ *
+ * This exists because the normal approximation is not valid at the sample sizes
+ * this benchmark produces, and worse, it has a floor: with five samples per
+ * group the smallest p it can ever report is 0.0122, so every "significant"
+ * result printed exactly that number and a reader could not tell a decisive
+ * separation from a marginal one. The exact floor at n=5 is 0.0079, and it
+ * keeps falling as samples are added, which is the behaviour a p-value is
+ * supposed to have.
+ */
+export function exactUDistribution(n1: number, n2: number): number[] {
+  const maxU = n1 * n2;
+  // w[n][m][u], built row by row. The recurrence is the classical one:
+  //   w(n, m, u) = w(n-1, m, u-m) + w(n, m-1, u)
+  // i.e. the last element in the ordering comes either from the first group
+  // (contributing m to U) or from the second (contributing nothing).
+  let previousRow: Float64Array[] = [];
+  for (let n = 0; n <= n1; n += 1) {
+    const row: Float64Array[] = [];
+    for (let m = 0; m <= n2; m += 1) {
+      const cell = new Float64Array(maxU + 1);
+      if (n === 0 || m === 0) {
+        cell[0] = 1;
+      } else {
+        const fromFirst = previousRow[m]!;
+        const fromSecond = row[m - 1]!;
+        for (let u = 0; u <= maxU; u += 1) {
+          cell[u] = (u - m >= 0 ? fromFirst[u - m]! : 0) + fromSecond[u]!;
+        }
+      }
+      row.push(cell);
+    }
+    previousRow = row;
+    if (n === n1) {
+      const counts = row[n2]!;
+      const sum = counts.reduce((acc, value) => acc + value, 0);
+      return Array.from(counts, (value) => value / sum);
+    }
+  }
+  return [1];
+}
+
+function exactTwoSidedP(u: number, n1: number, n2: number): number {
+  const pmf = exactUDistribution(n1, n2);
+  const mean = (n1 * n2) / 2;
+  // Two-sided: total mass at least as far from the mean as the observed U.
+  const distance = Math.abs(u - mean);
+  let tail = 0;
+  for (let value = 0; value < pmf.length; value += 1) {
+    if (Math.abs(value - mean) >= distance - 1e-9) tail += pmf[value]!;
+  }
+  return Math.min(1, tail);
+}
+
 export function mannWhitney(a: number[], b: number[]): ComparisonResult {
   const delta = cliffsDelta(a, b);
   const magnitude = Math.abs(delta) < 0.147 ? 'negligible'
@@ -103,7 +161,7 @@ export function mannWhitney(a: number[], b: number[]): ComparisonResult {
 
   const n1 = a.length;
   const n2 = b.length;
-  if (n1 === 0 || n2 === 0) return { p: 1, delta, magnitude };
+  if (n1 === 0 || n2 === 0) return { p: 1, delta, magnitude, method: 'normal' };
 
   // Rank the pooled sample, averaging ranks within ties.
   const pooled = [...a.map((v) => ({ v, from: 0 })), ...b.map((v) => ({ v, from: 1 }))]
@@ -129,16 +187,46 @@ export function mannWhitney(a: number[], b: number[]): ComparisonResult {
   const mean = (n1 * n2) / 2;
   const n = n1 + n2;
   const tieCorrection = tieGroups.reduce((sum, t) => sum + (t ** 3 - t), 0);
+
+  // Exact whenever the sample is small and untied — which is the usual case
+  // here, and exactly where the normal approximation is least defensible.
+  if (tieGroups.length === 0 && n1 <= 25 && n2 <= 25) {
+    return { p: exactTwoSidedP(u1, n1, n2), delta, magnitude, method: 'exact' };
+  }
+
   const variance = ((n1 * n2) / 12) * ((n + 1) - tieCorrection / (n * (n - 1)));
-  if (variance <= 0) return { p: 1, delta, magnitude };
+  if (variance <= 0) return { p: 1, delta, magnitude, method: 'normal' };
 
   // Continuity correction, then the two-sided normal tail.
   const z = (Math.abs(u1 - mean) - 0.5) / Math.sqrt(variance);
   const p = Math.min(1, 2 * (1 - 0.5 * (1 + erf(z / Math.SQRT2))));
-  return { p, delta, magnitude };
+  return { p, delta, magnitude, method: 'normal' };
 }
 
 /** Formats a median with its CI the way the report tables print it. */
 export function formatWithCi(value: number, ci: Interval, digits = 1): string {
   return `${value.toFixed(digits)} [${ci.low.toFixed(digits)}–${ci.high.toFixed(digits)}]`;
+}
+
+/**
+ * Holm-Bonferroni step-down adjustment, applied across every comparison a
+ * report makes.
+ *
+ * Without it this project runs well over a hundred tests at alpha = 0.05 and
+ * should expect several false positives by construction — and would print them
+ * as findings. Holm controls the family-wise error rate without assuming the
+ * tests are independent, which they are not: the same samples appear in several
+ * comparisons.
+ */
+export function holmAdjust(pValues: number[]): number[] {
+  const order = pValues
+    .map((p, index) => ({ p, index }))
+    .sort((a, b) => a.p - b.p);
+  const adjusted = new Array<number>(pValues.length);
+  let running = 0;
+  order.forEach(({ p, index }, rank) => {
+    running = Math.max(running, Math.min(1, (pValues.length - rank) * p));
+    adjusted[index] = running;
+  });
+  return adjusted;
 }

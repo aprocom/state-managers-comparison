@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bootstrapMedianCi, cliffsDelta, formatWithCi, mannWhitney, median, percentile,
+  exactUDistribution, holmAdjust,
 } from './stats';
 
 describe('percentile', () => {
@@ -95,5 +96,66 @@ describe('mannWhitney', () => {
 describe('formatWithCi', () => {
   it('prints the median and its interval', () => {
     expect(formatWithCi(12.34, { low: 11.1, high: 13.9 })).toBe('12.3 [11.1–13.9]');
+  });
+});
+
+describe('exactUDistribution', () => {
+  it('sums to 1', () => {
+    const pmf = exactUDistribution(5, 5);
+    expect(pmf.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 10);
+  });
+
+  it('has C(10,5) = 252 equally weighted arrangements at n=5, so the extreme U has mass 1/252', () => {
+    const pmf = exactUDistribution(5, 5);
+    expect(pmf[0]).toBeCloseTo(1 / 252, 12);
+    expect(pmf[25]).toBeCloseTo(1 / 252, 12);
+  });
+
+  it('is symmetric about the mean', () => {
+    const pmf = exactUDistribution(4, 6);
+    for (let u = 0; u <= 24; u += 1) expect(pmf[u]).toBeCloseTo(pmf[24 - u]!, 12);
+  });
+
+  it('matches the known mode for a small case', () => {
+    // n1=2, n2=2: U counts are 1,1,2,1,1 over 6 arrangements.
+    const pmf = exactUDistribution(2, 2);
+    expect(pmf.map((v) => Math.round(v * 6))).toEqual([1, 1, 2, 1, 1]);
+  });
+});
+
+describe('mannWhitney — exact branch', () => {
+  it('reports the exact floor of 2/252 for fully separated samples of five', () => {
+    const result = mannWhitney([10, 11, 12, 13, 14], [20, 21, 22, 23, 24]);
+    expect(result.method).toBe('exact');
+    expect(result.p).toBeCloseTo(2 / 252, 10);
+  });
+
+  it('goes below the normal approximation floor of 0.0122', () => {
+    expect(mannWhitney([1, 2, 3, 4, 5], [6, 7, 8, 9, 10]).p).toBeLessThan(0.0122);
+  });
+
+  it('falls back to the normal approximation when there are ties', () => {
+    expect(mannWhitney([1, 2, 2, 4, 5], [6, 7, 8, 9, 10]).method).toBe('normal');
+  });
+});
+
+describe('holmAdjust', () => {
+  it('leaves a single p-value alone', () => {
+    expect(holmAdjust([0.01])).toEqual([0.01]);
+  });
+
+  it('multiplies the smallest by the family size', () => {
+    expect(holmAdjust([0.01, 0.5, 0.5])[0]).toBeCloseTo(0.03, 10);
+  });
+
+  it('is monotone — an adjusted value never drops below a smaller one', () => {
+    const adjusted = holmAdjust([0.001, 0.04, 0.04, 0.9]);
+    const sorted = [...adjusted].sort((a, b) => a - b);
+    expect(adjusted.slice().sort((a, b) => a - b)).toEqual(sorted);
+    expect(Math.max(...adjusted)).toBeLessThanOrEqual(1);
+  });
+
+  it('caps at 1 rather than exceeding it', () => {
+    expect(holmAdjust([0.6, 0.7, 0.8]).every((p) => p <= 1)).toBe(true);
   });
 });

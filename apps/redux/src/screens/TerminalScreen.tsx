@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Feed } from '@smc/domain';
 import type { Alert, InstrumentId } from '@smc/domain';
-import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
+import { INITIAL_FEED_RATE, AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import { NOW, appStore, instrumentSelected, pinToggled, quoteApplied } from '../state/slice';
 import type { AppDispatch, RootState } from '../state/slice';
 import {
@@ -21,6 +21,7 @@ export function TerminalScreen() {
   const pinnedCount = useSelector(selectPinnedCount);
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [firedCount, setFiredCount] = useState(0);
 
   // Stable prop identity. An inline arrow would change every render and defeat
   // React.memo on all fifty rows, misreporting Redux as far slower than it is.
@@ -37,7 +38,7 @@ export function TerminalScreen() {
   useEffect(
     () => attachAlertEngine(appStore, {
       now: () => NOW,
-      onFire: () => {},
+      onFire: () => { setFiredCount((count) => count + 1); },
       onChange: setAlerts,
     }),
     [],
@@ -53,7 +54,7 @@ export function TerminalScreen() {
     const feed = createFeed({
       instruments: INSTRUMENTS,
       seed: 20260729,
-      updatesPerSecond: feedRate,
+      updatesPerSecond: INITIAL_FEED_RATE,
       startPrices: START_PRICES,
     });
     feedRef.current = feed;
@@ -72,7 +73,7 @@ export function TerminalScreen() {
 
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
-      <AlertList alerts={alerts} />
+      <AlertList alerts={alerts} firedCount={firedCount} />
       <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
       <InstrumentTable

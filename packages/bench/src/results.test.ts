@@ -11,6 +11,7 @@ function sample(overrides: Partial<RunSample>): RunSample {
     cpuThrottle: 1,
     elapsedMs: 6000,
     quotesDelivered: 600,
+    heldInstrumentQuotes: 72,
     instrumentRowRenders: 600,
     positionRowRenders: 72,
     rendersPerQuote: 1,

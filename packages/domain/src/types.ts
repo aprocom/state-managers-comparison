@@ -43,3 +43,19 @@ export interface Trade {
   strategy: string;
   note: string;
 }
+
+export type PriceDirection = 'up' | 'down' | 'flat';
+
+/**
+ * The one definition of what a price move looks like.
+ *
+ * Zustand and Redux set 'flat' on an equal-price quote; MobX, RxJS and Jotai
+ * returned early and left the previous direction in place. Unreachable with a
+ * geometric random walk that never repeats a price exactly, and guaranteed on
+ * any real feed with a tick size — at which point two implementations would
+ * render a different CSS class from the other three and no test would notice.
+ */
+export function nextDirection(previous: number, next: number): PriceDirection {
+  if (next === previous) return 'flat';
+  return next > previous ? 'up' : 'down';
+}

@@ -88,13 +88,44 @@ describe('mobx store — alerts', () => {
     dispose();
   });
 
-  it('stops firing once disposed', () => {
+  /**
+   * The requirement the whole comparison rests on: an alert fires once when the
+   * condition becomes true, stays quiet while it holds, and fires again after
+   * it has cleared and returned. Until now this existed only in the Zustand
+   * suite; the other four asserted only that a detached engine goes quiet,
+   * which passes even if the engine was never attached.
+   *
+   * Driven entirely through applyQuote, the one API all five expose: dropping
+   * BTC far enough puts unrealised P&L past the -400 daily loss limit.
+   */
+  it('re-fires after the condition clears and returns', () => {
+    const store = new AppStore({ seed: 11, tradeCount: 60, now: NOW });
+    const onFire = vi.fn<(alert: Alert) => void>();
+    const dispose = attachAlertEngine(store, onFire);
+    const dailyLoss = () => onFire.mock.calls.filter(
+      ([alert]) => alert.kind === 'daily-loss-limit',
+    ).length;
+
+    store.applyQuote(quote({ price: 20000, seq: 2 }));
+    expect(dailyLoss()).toBe(1);
+
+    store.applyQuote(quote({ price: 60000, seq: 3 }));
+    expect(dailyLoss()).toBe(1);
+
+    store.applyQuote(quote({ price: 20000, seq: 4 }));
+    expect(dailyLoss()).toBe(2);
+    dispose();
+  });
+
+  it('stops firing once disposed — with a change that would otherwise fire', () => {
     const store = new AppStore({ seed: 11, tradeCount: 60, now: NOW });
     const onFire = vi.fn<(alert: Alert) => void>();
     const dispose = attachAlertEngine(store, onFire);
     dispose();
     onFire.mockClear();
-    store.applyQuote(quote({ price: 61000, seq: 1 }));
+    // A quote that provably triggers the daily-loss alert when attached, so
+    // this cannot pass by nothing having happened.
+    store.applyQuote(quote({ price: 20000, seq: 2 }));
     expect(onFire).not.toHaveBeenCalled();
   });
 });

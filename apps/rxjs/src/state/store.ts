@@ -1,11 +1,12 @@
 import {
-  BehaviorSubject, Subject, Subscription, combineLatest, concatMap, map, merge, scan, shareReplay,
-  startWith,
+  BehaviorSubject, Subject, Subscription, combineLatest, concatMap, distinctUntilChanged, map,
+  merge, scan, shareReplay, startWith,
 } from 'rxjs';
 import type { Observable } from 'rxjs';
 import {
   INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
-  maxDrawdown, mulberry32, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
+  maxDrawdown, mulberry32, nextDirection, profitFactor, rMultiple, realizedPnl, unrealizedPnl,
+  winRate,
 } from '@smc/domain';
 import type {
   Alert, AlertContext, EquityPoint, InstrumentId, Position, Quote, Trade,
@@ -51,7 +52,7 @@ function initialInstrumentRows(): InstrumentRowModel[] {
     label: `${instrument.base}/${instrument.quote}`,
     price: START_PRICES[instrument.id] ?? 0,
     precision: instrument.pricePrecision,
-    changeDirection: 'flat' as PriceDirection,
+    changeDirection: 'flat',
     pinned: false,
   }));
 }
@@ -172,13 +173,13 @@ export function createAppStore(options: StoreOptions): AppStore {
       if (event.seq <= (rowSequences.get(event.instrumentId) ?? 0)) return rows;
       rowSequences.set(event.instrumentId, event.seq);
       const current = rows[index];
-      if (current === undefined || current.price === event.price) return rows;
+      if (current === undefined) return rows;
+      const changeDirection = nextDirection(current.price, event.price);
+      if (current.price === event.price && current.changeDirection === changeDirection) {
+        return rows;
+      }
       const next = rows.slice();
-      next[index] = {
-        ...current,
-        price: event.price,
-        changeDirection: event.price > current.price ? 'up' : 'down',
-      };
+      next[index] = { ...current, price: event.price, changeDirection };
       return next;
     }, initialRows),
     startWith(initialRows),
@@ -213,18 +214,42 @@ export function createAppStore(options: StoreOptions): AppStore {
     shareReplay({ bufferSize: 1, refCount: false }),
   );
 
-  const accountTotals$ = combineLatest([positionsSource$, priceState$, tradesSource$]).pipe(
-    map(([positions, priceState, trades]) => {
+  /**
+   * Its own stream, derived from trades alone, so a price tick cannot invalidate
+   * it. Computed inline inside accountTotals$ — which is what this used to do —
+   * a 250-element copy, sort and scan ran on every one of a thousand quotes a
+   * second, because priceState$ emits per quote.
+   */
+  const drawdown$ = tradesSource$.pipe(
+    map((trades) => maxDrawdown(equityCurve(trades))),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
+  /**
+   * The six prices the account totals and the alert rules actually read.
+   * `distinctUntilChanged` collapses the 88% of quotes that move an instrument
+   * nobody holds, which is the granularity MobX and Jotai get from reading
+   * per-instrument state in the first place.
+   */
+  const heldPrices$ = combineLatest([positionsSource$, priceState$]).pipe(
+    map(([positions, priceState]) => positions.map(
+      (position) => priceState.prices[position.instrumentId] ?? position.entryPrice,
+    )),
+    distinctUntilChanged(
+      (a, b) => a.length === b.length && a.every((value, index) => value === b[index]),
+    ),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
+  const accountTotals$ = combineLatest([positionsSource$, heldPrices$, drawdown$]).pipe(
+    map(([positions, heldPrices, drawdown]) => {
       let totalPnl = 0;
       let usedRisk = 0;
-      for (const position of positions) {
-        totalPnl += unrealizedPnl(
-          position,
-          priceState.prices[position.instrumentId] ?? position.entryPrice,
-        );
+      for (const [index, position] of positions.entries()) {
+        totalPnl += unrealizedPnl(position, heldPrices[index] ?? position.entryPrice);
         usedRisk += position.riskAmount;
       }
-      return { totalPnl, usedRisk, drawdown: maxDrawdown(equityCurve(trades)) };
+      return { totalPnl, usedRisk, drawdown };
     }),
     shareReplay({ bufferSize: 1, refCount: false }),
   );
@@ -276,17 +301,15 @@ export function createAppStore(options: StoreOptions): AppStore {
 
   // --- Alerts ----------------------------------------------------------------
 
-  const alertContext$ = combineLatest([positionsSource$, priceState$, tradesSource$]).pipe(
-    map(([positions, priceState, trades]): AlertContext => {
+  const alertContext$ = combineLatest([positionsSource$, heldPrices$, tradesSource$]).pipe(
+    map(([positions, heldPrices, trades]): AlertContext => {
       // The frozen clock, not Date.now() — see the note in the alert engine.
       const now = options.now;
       return {
         now,
         dailyPnl: positions.reduce(
-          (sum, position) => sum + unrealizedPnl(
-            position,
-            priceState.prices[position.instrumentId] ?? position.entryPrice,
-          ),
+          (sum, position, index) => sum
+            + unrealizedPnl(position, heldPrices[index] ?? position.entryPrice),
           0,
         ),
         dailyLossLimit: DAILY_LOSS_LIMIT,

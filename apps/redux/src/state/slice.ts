@@ -2,7 +2,9 @@ import {
   configureStore, createEntityAdapter, createListenerMiddleware, createSlice,
 } from '@reduxjs/toolkit';
 import type { EntityState, PayloadAction } from '@reduxjs/toolkit';
-import { INSTRUMENTS, START_PRICES, createTradeHistory, mulberry32 } from '@smc/domain';
+import {
+  INSTRUMENTS, START_PRICES, createTradeHistory, mulberry32, nextDirection,
+} from '@smc/domain';
 import type { InstrumentId, Position, Quote, Trade } from '@smc/domain';
 import type { JournalFilter } from '@smc/ui';
 
@@ -91,10 +93,9 @@ const appSlice = createSlice({
       const quote = action.payload;
       if (quote.seq <= (state.sequences[quote.instrumentId] ?? 0)) return;
       const previous = state.prices[quote.instrumentId];
-      state.priceDirections[quote.instrumentId] = previous === undefined
-        || previous === quote.price
-        ? 'flat'
-        : quote.price > previous ? 'up' : 'down';
+      state.priceDirections[quote.instrumentId] = nextDirection(
+        previous ?? quote.price, quote.price,
+      );
       state.prices[quote.instrumentId] = quote.price;
       state.sequences[quote.instrumentId] = quote.seq;
     },

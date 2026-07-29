@@ -33,7 +33,17 @@ const InstrumentRow = memo(function InstrumentRow(
     <tr
       data-testid={TESTID.instrumentRow(row.id)}
       className={selected ? 'row row--selected' : 'row'}
+      // Keyboard-reachable: the row is the primary control on this screen and a
+      // mouse-only selection is not an acceptable primary interaction.
+      tabIndex={0}
+      aria-selected={selected}
       onClick={() => onSelect(row.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect(row.id);
+        }
+      }}
     >
       <td>
         <button
@@ -41,6 +51,7 @@ const InstrumentRow = memo(function InstrumentRow(
           data-testid={TESTID.instrumentPin(row.id)}
           className={row.pinned ? 'pin pin--on' : 'pin'}
           aria-pressed={row.pinned}
+          aria-label={`${row.pinned ? 'Unpin' : 'Pin'} ${row.label}`}
           onClick={(event) => { event.stopPropagation(); onTogglePin(row.id); }}
         >
           {row.pinned ? '\u2605' : '\u2606'}

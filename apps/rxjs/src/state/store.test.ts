@@ -102,6 +102,44 @@ describe('rxjs store — alerts', () => {
     store.destroy();
   });
 
+  /**
+   * The requirement the whole comparison rests on: an alert fires once when the
+   * condition becomes true, stays quiet while it holds, and fires again after
+   * it has cleared and returned. Driven through the one API every
+   * implementation exposes — dropping BTC far enough puts unrealised P&L past
+   * the -400 daily loss limit.
+   */
+  it('re-fires after the condition clears and returns', () => {
+    const store = createAppStore({ seed: 11, tradeCount: 60, now: NOW });
+    const onFire = vi.fn<(alert: Alert) => void>();
+    const unsubscribe = store.onAlertFired(onFire);
+    const dailyLoss = () => onFire.mock.calls.filter(
+      ([alert]) => alert.kind === 'daily-loss-limit',
+    ).length;
+
+    store.applyQuote(quote({ price: 20000, seq: 2 }));
+    expect(dailyLoss()).toBe(1);
+
+    store.applyQuote(quote({ price: 60000, seq: 3 }));
+    expect(dailyLoss()).toBe(1);
+
+    store.applyQuote(quote({ price: 20000, seq: 4 }));
+    expect(dailyLoss()).toBe(2);
+    unsubscribe();
+    store.destroy();
+  });
+
+  it('stops firing once unsubscribed — with a change that would otherwise fire', () => {
+    const store = createAppStore({ seed: 11, tradeCount: 60, now: NOW });
+    const onFire = vi.fn<(alert: Alert) => void>();
+    const unsubscribe = store.onAlertFired(onFire);
+    unsubscribe();
+    onFire.mockClear();
+    store.applyQuote(quote({ price: 20000, seq: 2 }));
+    expect(onFire).not.toHaveBeenCalled();
+    store.destroy();
+  });
+
   it('keeps the alert array identity stable while the alert set is unchanged', () => {
     const store = createAppStore({ seed: 11, tradeCount: 60, now: NOW });
     const before = store.alerts$.getValue();

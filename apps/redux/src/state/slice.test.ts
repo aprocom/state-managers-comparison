@@ -99,13 +99,41 @@ describe('redux slice — alerts', () => {
     detach();
   });
 
-  it('stops evaluating once detached', () => {
+  /**
+   * The requirement the whole comparison rests on: an alert fires once when the
+   * condition becomes true, stays quiet while it holds, and fires again after
+   * it has cleared and returned. Driven through the one API every
+   * implementation exposes — dropping BTC far enough puts unrealised P&L past
+   * the -400 daily loss limit.
+   */
+  it('re-fires after the condition clears and returns', () => {
+    const store = createAppStore(createInitialState(11, 60, NOW));
+    const onFire = vi.fn<(alert: Alert) => void>();
+    const detach = attachAlertEngine(store, { now: () => NOW, onFire, onChange: () => {} });
+    const dailyLoss = () => onFire.mock.calls.filter(
+      ([alert]) => alert.kind === 'daily-loss-limit',
+    ).length;
+
+    store.dispatch(quoteApplied(quote({ price: 20000, seq: 2 })));
+    expect(dailyLoss()).toBe(1);
+
+    store.dispatch(quoteApplied(quote({ price: 60000, seq: 3 })));
+    expect(dailyLoss()).toBe(1);
+
+    store.dispatch(quoteApplied(quote({ price: 20000, seq: 4 })));
+    expect(dailyLoss()).toBe(2);
+    detach();
+  });
+
+  it('stops evaluating once detached — with a change that would otherwise fire', () => {
     const store = createAppStore(createInitialState(11, 60, NOW));
     const onFire = vi.fn<(alert: Alert) => void>();
     const detach = attachAlertEngine(store, { now: () => NOW, onFire, onChange: () => {} });
     detach();
     onFire.mockClear();
-    store.dispatch(quoteApplied(quote({ price: 61000, seq: 1 })));
+    // A quote that provably fires when attached, so this cannot pass by
+    // nothing having happened.
+    store.dispatch(quoteApplied(quote({ price: 20000, seq: 2 })));
     expect(onFire).not.toHaveBeenCalled();
   });
 });

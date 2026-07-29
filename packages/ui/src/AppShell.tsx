@@ -6,6 +6,9 @@ import { TESTID } from './testids';
 // end is where the comparison has to look.
 export const FEED_RATES = [10, 100, 1000];
 
+/** The rate every store starts at, and the rate the feed is constructed with. */
+export const INITIAL_FEED_RATE = 10;
+
 export function AppShell(props: {
   title: string;
   screen: 'terminal' | 'journal';

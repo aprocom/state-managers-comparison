@@ -11,7 +11,14 @@ import type { BenchmarkResult, RunSample } from '@smc/bench';
 const SOAK_MS = 5000;
 const INTERACTION_CLICKS = 8;
 const RATES = [10, 100, 1000] as const;
-const REPEATS = Number(process.env['BENCH_REPEATS'] ?? 5);
+/**
+ * Ten, not five. With five samples per cell the exact Mann-Whitney floor is
+ * 2/252 = 0.0079, and after correcting for the hundred-plus comparisons this
+ * report makes, nothing can reach significance no matter how large the real
+ * difference is. Ten per cell puts the floor at 2/184756 and gives the
+ * correction something to survive.
+ */
+const REPEATS = Number(process.env['BENCH_REPEATS'] ?? 10);
 
 /**
  * 1× is an unthrottled desktop, which is where almost every published state
@@ -44,9 +51,13 @@ function gitDescribe(): string {
   }
 }
 
+/** The instruments the seeded positions are held on, in every implementation. */
+const HELD_INSTRUMENTS = INSTRUMENTS.slice(0, 6).map((i) => i.id);
+
 interface Instrumentation {
   __SMC_RENDERS__: { instrumentRow: number; positionRow: number; journalRow: number };
   __SMC_QUOTES__: number;
+  __SMC_QUOTES_BY_INSTRUMENT__: Record<string, number>;
   __SMC_FRAME_TIMES__: number[];
   __SMC_LONG_TASKS__: { count: number; totalMs: number; blockingMs: number };
   __SMC_INTERACTIONS__: number[];
@@ -113,6 +124,7 @@ async function measure(
     const w = window as unknown as Instrumentation;
     w.__SMC_RENDERS__ = { instrumentRow: 0, positionRow: 0, journalRow: 0 };
     w.__SMC_QUOTES__ = 0;
+    w.__SMC_QUOTES_BY_INSTRUMENT__ = {};
     w.__SMC_FRAME_TIMES__ = [];
     w.__SMC_LONG_TASKS__ = { count: 0, totalMs: 0, blockingMs: 0 };
     w.__SMC_INTERACTIONS__ = [];
@@ -123,16 +135,20 @@ async function measure(
   await page.waitForTimeout(SOAK_MS);
 
   const after = await readMetrics();
-  const throughput = await page.evaluate(() => {
+  const throughput = await page.evaluate((heldInstruments) => {
     const w = window as unknown as Instrumentation;
+    const byInstrument = w.__SMC_QUOTES_BY_INSTRUMENT__ ?? {};
     return {
       renders: w.__SMC_RENDERS__,
       quotes: w.__SMC_QUOTES__,
+      heldQuotes: heldInstruments.reduce(
+        (sum, id) => sum + (byInstrument[id] ?? 0), 0,
+      ),
       frameTimes: w.__SMC_FRAME_TIMES__,
       longTasks: w.__SMC_LONG_TASKS__,
       elapsedMs: performance.now() - w.__SMC_T0__,
     };
-  });
+  }, HELD_INSTRUMENTS);
 
   // Interactions are driven after the throughput window so the clicks cannot
   // inflate the render counts they would otherwise be mixed into.
@@ -157,22 +173,23 @@ async function measure(
   // Anything past 1.5 vsync intervals is a frame the compositor did not get.
   const droppedFrames = intervals.filter((interval) => interval > 25).length;
 
-  const positionQuotes = throughput.quotes * (6 / 50);
-
   return {
     rate,
     repeat,
     cpuThrottle,
     elapsedMs: throughput.elapsedMs,
     quotesDelivered: throughput.quotes,
+    heldInstrumentQuotes: throughput.heldQuotes,
     instrumentRowRenders: throughput.renders.instrumentRow,
     positionRowRenders: throughput.renders.positionRow,
     rendersPerQuote: throughput.quotes === 0
       ? 0
       : throughput.renders.instrumentRow / throughput.quotes,
-    positionRendersPerQuote: positionQuotes === 0
+    // Measured, not assumed: the quotes that actually landed on a held
+    // instrument, counted by the feed.
+    positionRendersPerQuote: throughput.heldQuotes === 0
       ? 0
-      : throughput.renders.positionRow / positionQuotes,
+      : throughput.renders.positionRow / throughput.heldQuotes,
     fps: throughput.frameTimes.length / seconds,
     frameP99Ms: percentile(intervals, 99),
     droppedFrames,

@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Feed } from '@smc/domain';
-import type { Alert } from '@smc/domain';
-import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
+import { INITIAL_FEED_RATE, AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import type { InstrumentId } from '@smc/domain';
 import { appStore, attachAlertEngine } from '../state/store';
 
@@ -12,10 +11,15 @@ const selectInstrument = (id: InstrumentId) => appStore.selectInstrument(id);
 const togglePin = (id: InstrumentId) => appStore.togglePin(id);
 
 export const TerminalScreen = observer(function TerminalScreen() {
-  const [firedAlerts, setFiredAlerts] = useState<Alert[]>([]);
+  // The list renders the *current* alert set straight from the store. Driving
+  // it from onFire — which is a one-shot notification for newly triggered
+  // alerts — meant a cleared alert stayed on screen forever, because nothing
+  // fires on the way out. All five apps now render current state and use
+  // onFire only for the fired counter.
+  const [firedCount, setFiredCount] = useState(0);
 
   useEffect(
-    () => attachAlertEngine(appStore, () => { setFiredAlerts(appStore.alerts.slice()); }),
+    () => attachAlertEngine(appStore, () => { setFiredCount((count) => count + 1); }),
     [],
   );
 
@@ -29,7 +33,7 @@ export const TerminalScreen = observer(function TerminalScreen() {
     const feed = createFeed({
       instruments: INSTRUMENTS,
       seed: 20260729,
-      updatesPerSecond: appStore.feedRate,
+      updatesPerSecond: INITIAL_FEED_RATE,
       startPrices: START_PRICES,
     });
     feedRef.current = feed;
@@ -42,13 +46,18 @@ export const TerminalScreen = observer(function TerminalScreen() {
     };
   }, []);
 
+  // `feedRate` is read here so the observer re-runs the component when it
+  // changes; the effect then pushes it into the running feed. Listing an
+  // observable in a dependency array would not work — MobX invalidates the
+  // render, not the array.
+  const { feedRate } = appStore;
   useEffect(() => {
-    feedRef.current?.setRate(appStore.feedRate);
-  }, [appStore.feedRate]);
+    feedRef.current?.setRate(feedRate);
+  }, [feedRate]);
 
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
-      <AlertList alerts={firedAlerts} />
+      <AlertList alerts={appStore.alerts} firedCount={firedCount} />
       <AccountSummary {...appStore.accountTotals} pinnedCount={appStore.pinnedCount} />
       <PositionsPanel rows={appStore.positionRows} />
       <InstrumentTable

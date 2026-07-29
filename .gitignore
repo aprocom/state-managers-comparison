@@ -10,3 +10,6 @@ playwright-report/
 test-results/
 # Benchmark output is committed — the published numbers must be reproducible.
 
+
+# Editor/agent harness config — not part of the project
+.claude/

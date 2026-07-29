@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import {
+  nextDirection,
   INSTRUMENTS, START_PRICES, createTradeHistory, mulberry32,
 } from '@smc/domain';
 import type { Alert, InstrumentId, Position, Quote, Trade } from '@smc/domain';
@@ -83,10 +84,7 @@ export function createAppStore(options: StoreOptions) {
       if (quote.seq <= lastSeq) return;
 
       const previous = state.prices[quote.instrumentId];
-      const direction: PriceDirection =
-        previous === undefined || previous === quote.price
-          ? 'flat'
-          : quote.price > previous ? 'up' : 'down';
+      const direction = nextDirection(previous ?? quote.price, quote.price);
 
       set({
         prices: { ...state.prices, [quote.instrumentId]: quote.price },

@@ -1,5 +1,6 @@
 import { computed, makeObservable, observable, action, reaction } from 'mobx';
 import {
+  nextDirection,
   INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
   maxDrawdown, mulberry32, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
 } from '@smc/domain';
@@ -52,8 +53,7 @@ class InstrumentModel {
   applyQuote(quote: Quote): void {
     if (quote.seq <= this.seq) return;
     this.seq = quote.seq;
-    if (quote.price === this.price) return;
-    this.direction = quote.price > this.price ? 'up' : 'down';
+    this.direction = nextDirection(this.price, quote.price);
     this.price = quote.price;
   }
 
@@ -167,6 +167,7 @@ export class AppStore {
       instrumentRows: computed,
       pinnedCount: computed,
       positionRows: computed,
+      drawdown: computed,
       accountTotals: computed,
       filteredTrades: computed,
       journalRows: computed,
@@ -221,6 +222,11 @@ export class AppStore {
     return this.positionModels.map((model) => model.row);
   }
 
+  /** Depends only on closed trades, so it survives every price tick. */
+  get drawdown(): number {
+    return maxDrawdown(equityCurve(this.trades));
+  }
+
   get accountTotals(): { totalPnl: number; usedRisk: number; drawdown: number } {
     let totalPnl = 0;
     let usedRisk = 0;
@@ -228,7 +234,7 @@ export class AppStore {
       totalPnl += unrealizedPnl(position, this.priceOf(position.instrumentId, position.entryPrice));
       usedRisk += position.riskAmount;
     }
-    return { totalPnl, usedRisk, drawdown: maxDrawdown(equityCurve(this.trades)) };
+    return { totalPnl, usedRisk, drawdown: this.drawdown };
   }
 
   get filteredTrades(): Trade[] {

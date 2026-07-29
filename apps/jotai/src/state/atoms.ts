@@ -3,6 +3,7 @@ import { atom } from 'jotai';
 // official replacement is this package, same API.
 import { atomFamily } from 'jotai-family';
 import {
+  nextDirection,
   INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
   maxDrawdown, mulberry32, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
 } from '@smc/domain';
@@ -78,15 +79,12 @@ export const applyQuoteAtom = atom(null, (get, set, quote: Quote) => {
   const cellAtom = priceAtomFamily(quote.instrumentId);
   const cell = get(cellAtom);
   if (quote.seq <= cell.seq) return;
-  if (quote.price === cell.price) {
+  const direction = nextDirection(cell.price, quote.price);
+  if (quote.price === cell.price && cell.direction === direction) {
     set(cellAtom, { ...cell, seq: quote.seq });
     return;
   }
-  set(cellAtom, {
-    price: quote.price,
-    direction: quote.price > cell.price ? 'up' : 'down',
-    seq: quote.seq,
-  });
+  set(cellAtom, { price: quote.price, direction, seq: quote.seq });
 });
 
 // --- Base state -------------------------------------------------------------
@@ -148,6 +146,9 @@ export const positionRowsAtom = atom((get): PositionRowModel[] => get(positionsA
   .map((position) => get(positionRowAtomFamily(position.id)))
   .filter((row): row is PositionRowModel => row !== null));
 
+/** Depends only on closed trades, so it survives every price tick. */
+export const drawdownAtom = atom((get) => maxDrawdown(equityCurve(get(tradesAtom))));
+
 export const accountTotalsAtom = atom((get) => {
   let totalPnl = 0;
   let usedRisk = 0;
@@ -155,7 +156,7 @@ export const accountTotalsAtom = atom((get) => {
     totalPnl += unrealizedPnl(position, get(priceAtomFamily(position.instrumentId)).price);
     usedRisk += position.riskAmount;
   }
-  return { totalPnl, usedRisk, drawdown: maxDrawdown(equityCurve(get(tradesAtom))) };
+  return { totalPnl, usedRisk, drawdown: get(drawdownAtom) };
 });
 
 // --- Journal derivations ----------------------------------------------------

@@ -31,6 +31,7 @@ export const TESTID = {
     ? `alert-${kind}`
     : `alert-${kind}-${subjectId}`),
   alertList: 'alert-list',
+  alertFiredCount: 'alert-fired-count',
 
   tradeRow: (id: string) => `trade-row-${id}`,
   tradeStrategy: (id: string) => `trade-strategy-${id}`,

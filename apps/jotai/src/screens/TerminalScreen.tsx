@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
 import type { Feed } from '@smc/domain';
-import type { Alert } from '@smc/domain';
-import { AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
+import { INITIAL_FEED_RATE, AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import {
   accountTotalsAtom, alertsAtom, applyQuoteAtom, feedRateAtom, instrumentRowsAtom,
   pinnedCountAtom, positionRowsAtom, selectedInstrumentIdAtom, togglePinAtom,
@@ -21,10 +20,14 @@ export function TerminalScreen() {
   const togglePin = useSetAtom(togglePinAtom);
   const pinnedCount = useAtomValue(pinnedCountAtom);
 
-  const [firedAlerts, setFiredAlerts] = useState<Alert[]>(() => appStore.get(alertsAtom));
+  // Current alert set from the atom graph; onFire only counts. Driving the list
+  // from onFire meant a cleared alert never left the screen — see the note in
+  // the MobX screen.
+  const alerts = useAtomValue(alertsAtom);
+  const [firedCount, setFiredCount] = useState(0);
 
   useEffect(
-    () => attachAlertEngine(appStore, () => { setFiredAlerts(appStore.get(alertsAtom)); }),
+    () => attachAlertEngine(appStore, () => { setFiredCount((count) => count + 1); }),
     [],
   );
 
@@ -38,7 +41,7 @@ export function TerminalScreen() {
     const feed = createFeed({
       instruments: INSTRUMENTS,
       seed: 20260729,
-      updatesPerSecond: feedRate,
+      updatesPerSecond: INITIAL_FEED_RATE,
       startPrices: START_PRICES,
     });
     feedRef.current = feed;
@@ -57,7 +60,7 @@ export function TerminalScreen() {
 
   return (
     <div data-testid={TESTID.screenTerminal} className="terminal">
-      <AlertList alerts={firedAlerts} />
+      <AlertList alerts={alerts} firedCount={firedCount} />
       <AccountSummary {...totals} pinnedCount={pinnedCount} />
       <PositionsPanel rows={positionRows} />
       <InstrumentTable

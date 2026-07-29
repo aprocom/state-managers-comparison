@@ -2,7 +2,8 @@
 > phase, written before execution and amended during it — the three corrections
 > recorded inline (a peer-dependency pin, a missing test cleanup, a missing type
 > reference) are the ones found by actually running it. Kept as a record of how
-> the foundation was built, not as current documentation. Written in Russian.
+> the foundation was built, not as current documentation. It is addressed to an
+> automated executor, which is how it was run.
 
 # Foundation & Reference Implementation — Implementation Plan
 

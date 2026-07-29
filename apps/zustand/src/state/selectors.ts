@@ -111,6 +111,21 @@ export function selectPositionRows(state: AppState): PositionRowModel[] {
   });
 }
 
+/**
+ * Drawdown depends only on closed trades, which never change while the terminal
+ * is streaming — so it is derived separately and cached on the trades array.
+ *
+ * It used to be computed inline below, inside a selector that `prices`
+ * invalidates on every quote. That put a 250-element copy, sort and scan on the
+ * hot path a thousand times a second in this app, in Redux and in RxJS, while
+ * MobX and Jotai read prices per held instrument and so paid it on 12% of
+ * quotes. The published CPU numbers were substantially measuring that asymmetry
+ * rather than the libraries.
+ */
+const buildDrawdown = memoizeOne(
+  (trades: AppState['trades']) => maxDrawdown(equityCurve(trades)),
+);
+
 /** Primitives only, so `useShallow` at the call site is the whole story. */
 export function selectAccountTotals(state: AppState): {
   totalPnl: number; usedRisk: number; drawdown: number;
@@ -121,7 +136,14 @@ export function selectAccountTotals(state: AppState): {
     totalPnl += unrealizedPnl(position, state.prices[position.instrumentId] ?? position.entryPrice);
     usedRisk += position.riskAmount;
   }
-  return { totalPnl, usedRisk, drawdown: maxDrawdown(equityCurve(state.trades)) };
+  return { totalPnl, usedRisk, drawdown: buildDrawdown(state.trades) };
+}
+
+/** The prices the alert rules actually read: one per open position. */
+export function selectHeldPrices(state: AppState): number[] {
+  return state.positions.map(
+    (position) => state.prices[position.instrumentId] ?? position.entryPrice,
+  );
 }
 
 // --- Journal ----------------------------------------------------------------

@@ -93,17 +93,35 @@ export const selectPositionRows = createSelector(
   }),
 );
 
+/**
+ * Its own selector, so it is cached on the trades array rather than recomputed
+ * whenever a price moves. Composed inline below, it turned a 250-element copy,
+ * sort and scan into hot-path work on every one of a thousand quotes a second.
+ * This is what `createSelector` composition is for and the earlier version
+ * simply did not use it.
+ */
+export const selectDrawdown = createSelector(
+  [selectTrades],
+  (trades) => maxDrawdown(equityCurve(trades)),
+);
+
 export const selectAccountTotals = createSelector(
-  [selectPositions, selectPrices, selectTrades],
-  (positions, prices, trades) => {
+  [selectPositions, selectPrices, selectDrawdown],
+  (positions, prices, drawdown) => {
     let totalPnl = 0;
     let usedRisk = 0;
     for (const position of positions) {
       totalPnl += unrealizedPnl(position, prices[position.instrumentId] ?? position.entryPrice);
       usedRisk += position.riskAmount;
     }
-    return { totalPnl, usedRisk, drawdown: maxDrawdown(equityCurve(trades)) };
+    return { totalPnl, usedRisk, drawdown };
   },
+);
+
+/** The instruments the alert rules actually read a price for. */
+export const selectHeldInstrumentIds = createSelector(
+  [selectPositions],
+  (positions) => positions.map((position) => position.instrumentId),
 );
 
 export const selectFilteredTrades = createSelector(

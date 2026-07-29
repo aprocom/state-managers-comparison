@@ -1,6 +1,7 @@
 import { avgHoldingMs, evaluateAlerts, unrealizedPnl } from '@smc/domain';
 import type { Alert, AlertContext } from '@smc/domain';
 import type { AppState, createAppStore } from './store';
+import { selectHeldPrices } from './selectors';
 
 export const DAILY_LOSS_LIMIT = 400;
 export const RISK_LIMIT_PER_TRADE = 100;
@@ -59,9 +60,16 @@ export function attachAlertEngine(
   };
 
   evaluate(store.getState());
+  // Select the six held prices, not the `prices` object. The object is rebuilt
+  // on every quote, so an identity comparison on it never short-circuits — the
+  // earlier version of this guard fired on 100% of quotes while its comment
+  // claimed otherwise.
   return store.subscribe(
-    (state) => [state.prices, state.positions, state.trades] as const,
+    (state): readonly unknown[] => [state.positions, state.trades, ...selectHeldPrices(state)],
     () => { evaluate(store.getState()); },
-    { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] },
+    {
+      equalityFn: (a, b) => a.length === b.length
+        && a.every((value, index) => Object.is(value, b[index])),
+    },
   );
 }
