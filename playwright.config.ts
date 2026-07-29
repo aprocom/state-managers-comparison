@@ -1,0 +1,17 @@
+import { defineConfig } from '@playwright/test';
+import { APP_TARGETS } from './packages/bench/src/apps';
+
+export default defineConfig({
+  testDir: './e2e',
+  fullyParallel: false,
+  forbidOnly: Boolean(process.env['CI']),
+  retries: process.env['CI'] === undefined ? 0 : 1,
+  reporter: [['list'], ['html', { open: 'never' }]],
+  use: { trace: 'on-first-retry' },
+  webServer: APP_TARGETS.map((target) => ({
+    command: `npm run preview -w ${target.workspace} -- --port ${target.port} --strictPort`,
+    port: target.port,
+    reuseExistingServer: process.env['CI'] === undefined,
+    timeout: 120_000,
+  })),
+});

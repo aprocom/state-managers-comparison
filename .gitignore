@@ -10,3 +10,7 @@ playwright-report/
 test-results/
 bench-results/*.json
 !bench-results/.gitkeep
+
+# Playwright
+playwright-report/
+test-results/

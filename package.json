@@ -13,9 +13,12 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/ui"
+    "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/bench && tsc --noEmit -p apps/zustand",
+    "build:apps": "npm run build --workspaces --if-present",
+    "test:e2e": "npm run build:apps && playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
