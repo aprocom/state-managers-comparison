@@ -5,3 +5,5 @@ export * from './random';
 export * from './feed';
 export * from './instruments';
 export * from './calculations';
+export * from './alerts';
+export * from './fixtures';

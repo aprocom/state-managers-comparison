@@ -1246,7 +1246,7 @@ export * from './fixtures';
 - [ ] **Step 8: Run the tests to verify they pass**
 
 Run: `npx vitest run packages/domain`
-Expected: PASS — 53 tests.
+Expected: PASS — 52 tests.
 
 - [ ] **Step 9: Commit**
 
@@ -2108,7 +2108,7 @@ Extend the root `typecheck` script now that a second package exists:
 - [ ] **Step 11: Run the tests to verify they pass**
 
 Run: `npx vitest run`
-Expected: PASS — 53 domain tests plus 7 UI tests.
+Expected: PASS — 52 domain tests plus 7 UI tests.
 
 - [ ] **Step 12: Commit**
 
@@ -3236,7 +3236,7 @@ git commit -m "test: cross-app functional parity suite"
 
 ## What this plan delivers
 
-A working TraderCat Lite on Zustand with both screens and the alert engine, backed by a shared domain package with 53 unit tests, a shared component library, and an 8-case parity suite that every later implementation must pass unchanged.
+A working TraderCat Lite on Zustand with both screens and the alert engine, backed by a shared domain package with 52 unit tests, a shared component library, and an 8-case parity suite that every later implementation must pass unchanged.
 
 ## Next plans
 
