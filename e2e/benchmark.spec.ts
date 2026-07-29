@@ -213,6 +213,13 @@ async function measure(
     recalcStyleMsPerSecond: perSecond('RecalcStyleDuration'),
     layoutMsPerSecond: perSecond('LayoutDuration'),
     taskMsPerSecond: perSecond('TaskDuration'),
+    // Recorded because it is the counter that sees CPU throttling. Chromium
+    // emulates a slower CPU by having the renderer thread spin, and the spin
+    // sits outside every script and task, so ScriptDuration barely moves while
+    // ThreadTime multiplies. `npm run probe:throttle` demonstrates it on a page
+    // doing fixed work; this field lets the same thing be checked in the
+    // benchmark's own samples rather than taken on trust.
+    threadMsPerSecond: perSecond('ThreadTime'),
   };
 }
 

@@ -30,6 +30,7 @@ function sample(overrides: Partial<RunSample>): RunSample {
     recalcStyleMsPerSecond: 2,
     layoutMsPerSecond: 9,
     taskMsPerSecond: 50,
+    threadMsPerSecond: 60,
     ...overrides,
   };
 }

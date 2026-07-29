@@ -62,7 +62,15 @@ export default tseslint.config(
     files: ['scripts/**/*.mjs', 'scripts/**/*.ts'],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {
-      globals: { process: 'readonly', URL: 'readonly', console: 'readonly' },
+      // `window` is here for the throttle probe, whose page callbacks run in
+      // the browser rather than in node.
+      globals: {
+        process: 'readonly',
+        URL: 'readonly',
+        console: 'readonly',
+        window: 'readonly',
+        performance: 'readonly',
+      },
     },
   },
   {

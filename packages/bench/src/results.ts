@@ -48,6 +48,12 @@ export interface RunSample {
   recalcStyleMsPerSecond: number;
   layoutMsPerSecond: number;
   taskMsPerSecond: number;
+  /**
+   * Renderer thread time per second of wall clock — the counter that actually
+   * responds to CPU throttling, because Chromium emulates a slow CPU by making
+   * the thread spin and the spin lands outside every script and task.
+   */
+  threadMsPerSecond: number;
 }
 
 export interface BenchmarkResult {
@@ -99,7 +105,8 @@ export function positionRendersPerQuoteCeiling(rate: number): number {
 }
 
 export type MetricKey =
-  | 'scriptMsPerSecond' | 'taskMsPerSecond' | 'rendersPerQuote' | 'positionRendersPerQuote'
+  | 'scriptMsPerSecond' | 'taskMsPerSecond' | 'threadMsPerSecond'
+  | 'rendersPerQuote' | 'positionRendersPerQuote'
   | 'fps' | 'frameP99Ms' | 'droppedFrames' | 'totalBlockingMs' | 'interactionWorstMs';
 
 export interface MetricSummary {
