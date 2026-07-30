@@ -328,7 +328,7 @@ npm run metrics
 
 The parity suites are the acceptance gate: every implementation must pass the same functional tests and produce an identical derived-state vector before its performance is measured at all.
 
-Current counts: **175 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
+Current counts: **184 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
 
 ## Licence
 
