@@ -8,14 +8,29 @@ The same app is built five times. Everything except the state layer is shared: d
 
 **If you read one section, read [What this cannot tell you](#what-this-cannot-tell-you).** It is the point of the project. A comparison whose author has not tried to break it is a rumour with numbers attached.
 
+**Contents** — [The short version](#the-short-version) · [Which one should I use?](#which-one-should-i-use) · [Why these five](#why-these-five) · [The reference application](#the-reference-application) · [Methodology](#methodology) · [Results](#results) · [What this cannot tell you](#what-this-cannot-tell-you) · [The bugs this project shipped](#the-bugs-this-project-shipped) · [Prior art](#prior-art) · [Status](#status) · [Design history](#design-history) · [A note on Effector](#a-note-on-effector) · [Running it](#running-it)
+
 ---
 
 ## The short version
 
-1. **On this workload, the state manager is not the bottleneck** — but that sentence has to be earned, not asserted, and the earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
-2. **The only axis where anything separates is main-thread CPU, and even there only two of the five separate** — MobX and RxJS cost roughly half what Redux and Jotai do at 1000 updates/sec, on output the cross-app suite proves identical, but after correcting for every comparison the report makes, just 11 of 360 survive. Render counts, frame rate, interaction latency and blocking time separate nothing at any rate, and at the rate this project used to headline, the render-count metric could not have separated a deliberately broken implementation either.
+1. **On this workload, the state manager is not the bottleneck.** That sentence has to be earned rather than asserted, and an earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
+2. **The only axis where anything separates is main-thread CPU, and even there only two of the five separate.** At 1000 updates/sec MobX and RxJS cost roughly half what Redux and Jotai do, on output the cross-app suite proves identical. Render counts, frame rate, interaction latency and blocking time separate nothing, at any rate. Across the whole report, 11 of 360 pairwise comparisons survive the correction for having run that many.
 3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work — more than every architectural difference between the five combined.
 4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
+
+---
+
+## Which one should I use?
+
+This project will not rank them for you, and that refusal is a result rather than a dodge. At 10 and 100 updates/sec nothing separates from anything on any metric. At 1000 the ordering *inside* the expensive group did not survive a re-run on the same machine — the grouping replicated, the order did not.
+
+What the measurements do support:
+
+- **If your update rate is anything like normal** — a form, a dashboard, a CRUD screen — choose on the axes in [Complexity](#complexity), [Cost of change](#cost-of-change) and [Where the correctness burden falls](#where-the-correctness-burden-falls). Performance will not decide it for you, because at those rates there is nothing to decide.
+- **If you are pushing hundreds of updates a second into a live view**, main-thread CPU is the one axis that moves. The grouping that replicated across two runs is MobX and RxJS cheap, Zustand, Redux and Jotai expensive — a grouping, not an order. Measure it on your own workload first; this one is 50 rows and six positions, and [the granularity story that ought to explain the grouping does not](#main-thread-cpu).
+- **If the codebase will outlive the people who wrote it**, [Where the correctness burden falls](#where-the-correctness-burden-falls) is worth more than either table. Redux disturbs the most already-working code per change — 24 lines against MobX's two — and is the most predictable about which lines those will be. MobX and Jotai sit at the other end, and they fail the most quietly when the dependency graph is built at the wrong granularity, which is exactly the bug this project shipped in both of them.
+- **Whichever you pick, the biggest win here is not the library.** One stable callback identity outweighed every difference between the five combined. If your live view is slow, look at your own derivation graph and your own render props before you look at the store.
 
 ---
 
@@ -63,11 +78,11 @@ Stated in full, because in this genre the methodology *is* the contribution.
 
 **A discarded warm-up per app**, so the first load's JIT tiering and one-time module evaluation do not land in the samples. This means the numbers describe warm, peak performance and not the cold path — a limitation, declared.
 
-**Measured denominators.** The feed counts the quotes it actually delivers and the harness divides by that. The previous version divided by `configuredRate × elapsedSeconds`, a denominator nothing ever verified; one of its published samples read 1.008 renders per quote, a value the metric's own ceiling proves impossible.
+**Measured denominators.** The feed counts the quotes it actually delivers and the harness divides by that. The previous version divided by `configuredRate × elapsedSeconds`, a denominator nothing ever verified — and published a number its own metric proves impossible ([bugs 2 and 4](#the-bugs-this-project-shipped)).
 
 **Statistics, not point estimates.** Every median carries a seeded bootstrap 95% confidence interval. Each implementation is tested against the best one on that metric with a two-sided Mann-Whitney U test — a rank test, because CPU and latency samples are bounded below and right-skewed, not normal — computed **exactly** where the samples are untied. That matters: the normal approximation has a floor of 0.0122 at five samples per group, so an earlier version printed exactly 0.0122 for every significant result and a reader could not tell a decisive separation from a marginal one.
 
-**p-values are Holm-adjusted across all 360 pairwise comparisons these samples admit** — every pair in every cell, not only the ones the tables print. Running that many tests at α = 0.05 and printing raw values would be expected to produce a double-figure count of false positives and present them as findings. The wider family is deliberate: the reference row in each table is whichever implementation came out best *in these same samples*, so what is printed has already survived a selection, and correcting only over the printed comparisons would ignore that the winner itself was chosen from the data. Correcting over all pairs covers every comparison the selection could have produced. Effect size is Cliff's delta bucketed by the Romano thresholds, so a difference can be statistically real and still be reported as practically negligible. Any row the test does not separate is printed as "not significant" — which is not evidence of equality, only of undetected difference.
+**p-values are Holm-adjusted across all 360 pairwise comparisons these samples admit** — every pair in every cell, not only the ones the tables print. Holm inflates each p-value according to how many tests were run at all, so the 5% risk applies to the whole family producing even one false positive rather than to each comparison on its own. Running that many tests at α = 0.05 and printing the raw values would be expected to produce a double-figure count of false positives and present them as findings. The wider family is deliberate: the reference row in each table is whichever implementation came out best *in these same samples*, so what is printed has already survived a selection, and correcting only over the printed comparisons would ignore that the winner itself was chosen from the data. Correcting over all pairs covers every comparison the selection could have produced. Effect size is Cliff's delta — how often a sample from one implementation beats a sample from the other, net of the reverse — bucketed by the Romano thresholds, so a difference can be statistically real and still be reported as practically negligible. Any row the test does not separate is printed as "not significant" — which is not evidence of equality, only of undetected difference.
 
 **Two CPU conditions**, 1× and 4× via CDP `Emulation.setCPUThrottlingRate`. Every comparison in this genre stops at an unthrottled desktop, which is exactly where nothing differs.
 
@@ -260,7 +275,7 @@ This project is not the first to build one app several ways.
 - **[gothinkster/realworld](https://github.com/gothinkster/realworld)** — the gold standard for app realism, 100+ implementations against one API spec. Explicitly refuses to measure.
 - **[dai-shi/will-this-react-global-state-work-in-concurrent-rendering](https://github.com/dai-shi/will-this-react-global-state-work-in-concurrent-rendering)** — tearing and concurrency safety across ~23 libraries, as pass/fail. A dimension this project does not cover and should.
 - **[krausest/js-framework-benchmark](https://github.com/krausest/js-framework-benchmark)** and [Nolan Lawson's analysis of its limits](https://nolanlawson.com/2024/10/13/the-greatness-and-limitations-of-the-js-framework-benchmark/) — the limitations section above is written in the register that post established.
-- **[Дмитрий Карловский's reactivity benchmark](https://habr.com/ru/articles/707600/)** — the only comparison I found that gates performance behind *correctness* tests, and the one whose framing most influenced this project's decision to require parity before timing.
+- **[Дмитрий Карловский's reactivity benchmark](https://habr.com/ru/articles/707600/)** _(in Russian)_ — the only comparison I found that gates performance behind *correctness* tests, and the one whose framing most influenced this project's decision to require parity before timing.
 
 What is new here is the combination: same app N ways, *and* real measurement, *and* the measurement's own limits reported as a first-class result.
 
@@ -290,7 +305,7 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 
 ## A note on Effector
 
-Effector is prominent in Russian-language discussion and largely absent from English-language comparisons, which makes it easy to misjudge in either direction. It was excluded here on hiring reach, not on quality. The most useful public evidence is [VK's twelve-month production post-mortem](https://habr.com/ru/companies/vk/articles/839632/), which names specific structural problems — no dynamic store instances, no garbage collection, depth-first traversal causing redundant recomputation on diamond dependency graphs, and cyclic dependencies that freeze the app with no detection — against [ДомКлик's earlier positive experience](https://habr.com/ru/company/domclick/blog/532016/). Both are real production reports and they disagree; VK's is the better-evidenced of the two.
+Effector is prominent in Russian-language discussion and largely absent from English-language comparisons, which makes it easy to misjudge in either direction. It was excluded here on hiring reach, not on quality. The most useful public evidence is [VK's twelve-month production post-mortem](https://habr.com/ru/companies/vk/articles/839632/) _(in Russian, as is the ДомКлик piece below)_, which names specific structural problems — no dynamic store instances, no garbage collection, depth-first traversal causing redundant recomputation on diamond dependency graphs, and cyclic dependencies that freeze the app with no detection — against [ДомКлик's earlier positive experience](https://habr.com/ru/company/domclick/blog/532016/). Both are real production reports and they disagree; VK's is the better-evidenced of the two.
 
 ---
 
