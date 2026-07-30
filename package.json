@@ -2,6 +2,27 @@
   "name": "state-managers-comparison",
   "private": true,
   "version": "0.1.0",
+  "description": "Five React state managers, one non-trivial application, measured properly — including the parts where the measurement says nothing.",
+  "license": "MIT",
+  "author": "Alexey Yakovlev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aprocom/state-managers-comparison.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aprocom/state-managers-comparison/issues"
+  },
+  "homepage": "https://github.com/aprocom/state-managers-comparison#readme",
+  "keywords": [
+    "react",
+    "state-management",
+    "benchmark",
+    "rxjs",
+    "redux-toolkit",
+    "mobx",
+    "zustand",
+    "jotai"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"
