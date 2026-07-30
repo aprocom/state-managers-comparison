@@ -15,7 +15,7 @@ The same app is built five times. Everything except the state layer is shared: d
 ## The short version
 
 1. **On this workload, the state manager is not the bottleneck.** That sentence has to be earned rather than asserted, and an earlier version of this README asserted it from a metric that was mathematically incapable of showing anything else.
-2. **The only axis where anything separates is main-thread CPU, and even there only two of the five separate.** At 1000 updates/sec MobX and RxJS cost roughly half what Redux and Jotai do, on output the cross-app suite proves identical. Render counts, frame rate, interaction latency and blocking time separate nothing, at any rate. Across the whole report, 11 of 360 pairwise comparisons survive the correction for having run that many.
+2. **The only axis where anything separates is main-thread CPU.** At 1000 updates/sec MobX and RxJS cost roughly half what Zustand, Redux and Jotai do, on output the cross-app suite proves identical. Render counts, frame rate, interaction latency and blocking time separate nothing, at any rate, in any of three runs. Across the whole report, 31 of 360 pairwise comparisons survive the correction for having run that many – and every one of them is this one metric.
 3. **The largest performance effect measured here came from my own code, not from any library.** One inline arrow function cost 50× the render work – more than every architectural difference between the five combined.
 4. **Where the libraries genuinely differ is who carries the correctness burden**: which invariants the library maintains for you, and which you have to re-derive by hand every time someone new touches the code.
 
@@ -23,12 +23,12 @@ The same app is built five times. Everything except the state layer is shared: d
 
 ## Which one should I use?
 
-This project will not rank them for you, and that refusal is a result rather than a dodge. At 10 and 100 updates/sec nothing separates from anything on any metric. At 1000 the ordering *inside* the expensive group did not survive a re-run on the same machine – the grouping replicated, the order did not.
+This project will not rank them for you, and that refusal is a result rather than a dodge. Only one metric out of six ever separates anything, and the ordering *inside* the expensive group did not hold across three runs on the same machine – the grouping replicated, the order did not. Which of the cheap two is cheapest even depends on the rate: RxJS at 10 and 100 updates per second, MobX at 1000.
 
 What the measurements do support:
 
-- **If your update rate is anything like normal** – a form, a dashboard, a CRUD screen – choose on the axes in [Complexity](#complexity), [Cost of change](#cost-of-change) and [Where the correctness burden falls](#where-the-correctness-burden-falls). Performance will not decide it for you, because at those rates there is nothing to decide.
-- **If you are pushing hundreds of updates a second into a live view**, main-thread CPU is the one axis that moves. The grouping that replicated across two runs is MobX and RxJS cheap, Zustand, Redux and Jotai expensive – a grouping, not an order. Measure it on your own workload first; this one is 50 rows and six positions, and [the granularity story that ought to explain the grouping does not](#main-thread-cpu).
+- **If your update rate is anything like normal** – a form, a dashboard, a CRUD screen – choose on the axes in [Complexity](#complexity), [Cost of change](#cost-of-change) and [Where the correctness burden falls](#where-the-correctness-burden-falls). Even at 10 updates per second the whole spread is 8.7 to 10.9 ms of scripting per second of wall clock, which is a rounding error against a 16.7 ms frame budget. Something separates there statistically; nothing separates there that a user could feel.
+- **If you are pushing hundreds of updates a second into a live view**, main-thread CPU is the one axis that moves. The grouping that replicated across three runs is MobX and RxJS cheap, Zustand, Redux and Jotai expensive – a grouping, not an order. Measure it on your own workload first; this one is 50 rows and six positions, and [the granularity story that ought to explain the grouping does not](#main-thread-cpu).
 - **If the codebase will outlive the people who wrote it**, [Where the correctness burden falls](#where-the-correctness-burden-falls) is worth more than either table. Redux disturbs the most already-working code per change – 24 lines against MobX's two – and is the most predictable about which lines those will be. MobX and Jotai sit at the other end, and they fail the most quietly when the dependency graph is built at the wrong granularity, which is exactly the bug this project shipped in both of them.
 - **Whichever you pick, the biggest win here is not the library.** One stable callback identity outweighed every difference between the five combined. If your live view is slow, look at your own derivation graph and your own render props before you look at the store.
 
@@ -124,17 +124,23 @@ Milliseconds of scripting per second of wall clock at 1000 updates/sec, unthrott
 
 | | CPU ms/s | p | effect |
 |---|---:|---:|---|
-| **MobX** | 29.6 [21.0–35.7] | – | best |
-| **RxJS** | 37.0 [25.3–40.6] | 1.0000 | not significant |
-| **Zustand** | 58.9 [39.8–66.3] | 0.0718 | not significant |
-| **Redux Toolkit** | 72.3 [50.9–82.0] | 0.0039 | large |
-| **Jotai** | 79.4 [51.1–87.6] | 0.0039 | large |
+| **MobX** | 29.8 [27.7–31.7] | – | best |
+| **RxJS** | 38.5 [36.0–38.9] | 0.0677 | not significant |
+| **Zustand** | 65.3 [62.4–69.9] | 0.0039 | large |
+| **Redux Toolkit** | 70.4 [65.9–78.6] | 0.0039 | large |
+| **Jotai** | 83.7 [70.4–86.9] | 0.0039 | large |
 
-**Two of the four gaps survive the correction. Read the table as that, not as a ranking of five.** The medians span 2.7×, but the intervals are wide and heavily overlapping, and only Redux and Jotai are separated from MobX by more than this study can attribute to noise. Zustand at p = 0.07 is the kind of result that becomes a finding only if you go looking for one. RxJS is not distinguishable from MobX here at all. Under 4× throttling Zustand separates as well and the rest holds; at 10 and 100 updates/sec **nothing separates from anything, on any metric**. Across the entire report, five printed comparisons survive the correction and all five are this metric at this rate – eleven survive out of the full 360-pair family, which includes pairs the tables do not print.
+**Three of the four gaps survive the correction, and RxJS still does not separate from MobX.** The medians span 2.8×. Read the table as three separations and one non-result, not as a ranking of five: nothing here licenses a claim about Zustand versus Redux, or Redux versus Jotai, because those pairs were not the comparison made.
 
-What did replicate across two independent 35-minute runs on this machine is the *grouping*: MobX and RxJS cheap, Zustand, Redux and Jotai expensive. What did not replicate is the order inside the expensive group – the previous run had Zustand 74.4, Jotai 87.5, Redux 89.2 and this one has Zustand 58.9, Redux 72.3, Jotai 79.4. Anyone quoting a first-to-fifth ordering from this project is quoting noise.
+**This is the third run of this benchmark, and the change from the second is not what I expected.** The medians barely moved – MobX 29.6 to 29.8, RxJS 37.0 to 38.5, Redux 72.3 to 70.4, Jotai 79.4 to 83.7, Zustand 58.9 to 65.3, every one of them inside the previous run's interval, and in mixed directions. What changed is the *precision*: MobX's interval went from [21.0–35.7] to [27.7–31.7], and every other interval tightened comparably. The machine was quieter, nothing more.
 
-Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `5f4a143`, recorded in the results file, from a clean working tree; nothing under `apps/` or `packages/` has changed since.
+That has a consequence worth stating plainly, because it cuts against how the previous version of this section read. **A tighter run detects more, so more things separate – 31 of the 360 pairwise comparisons survive Holm where 11 did before, and 16 of the printed ones where 5 did.** Most of the new survivors are at **10 and 100 updates/sec**, where this README previously said in bold that nothing separated from anything. That claim was true of those samples and false as a statement about the world; the difference between "no effect" and "no effect this study could resolve" is exactly the difference a noisier run hides. Every one of the 31 is still main-thread CPU. No other metric separates anything at any rate under either CPU condition, across three independent runs.
+
+At the lower rates the ordering is also not the same one: **RxJS is the cheapest at 10 and at 100 updates/sec, and MobX only takes the lead at 1000.** At 100/sec RxJS 15.4 [15.0–16.0] separates from Zustand, Jotai and Redux but not from MobX at 17.0; at 10/sec only Redux separates from RxJS at all.
+
+What has now replicated across three runs is the *grouping*: MobX and RxJS cheap, Zustand, Redux and Jotai expensive. The order inside the expensive group agreed between the last two runs (Zustand, Redux, Jotai) and disagreed with the run before that (Zustand, Jotai, Redux). Two agreements out of three is not enough to quote a first-to-fifth ranking from this project, and I am not going to start now on the strength of one quiet afternoon.
+
+Full tables for every metric, rate and condition: **[bench-results/report.md](bench-results/report.md)**. The samples were produced by commit `0397892`, recorded in the results file, from a clean working tree, and the run is gated: `npm run bench` fails before it measures anything if the parity suites do not pass.
 
 **Read this table knowing that the previous version of it was wrong.** Before the last round of fixes, three implementations recomputed a 250-trade drawdown on every quote while two recomputed it on 12% of them, purely because of where that invariant sat in each derivation graph. Jotai in particular was near the *top* of the table for that reason and is now near the bottom. This is the second confident performance ranking this project produced that turned out to be measuring its own code, and a third should be assumed live until someone outside it has looked.
 
@@ -162,7 +168,7 @@ The second cause is what the residue was, and it took an experiment rather than 
 npm run probe:throttle
 ```
 
-The benchmark now records `threadMsPerSecond` alongside the script counter, so the same thing is checkable in this project's own samples: between the two levels scripting time moves 0.67×–0.99× while renderer thread time moves 10×–12×. So the ratio being near or below 1 was never physically impossible – it was a counter answering a question I wasn't asking. **The ordering within each throttle section is measured identically for all five and is comparable. The magnitudes between sections are not, and no amount of re-running will make them so.**
+The benchmark now records `threadMsPerSecond` alongside the script counter, so the same thing is checkable in this project's own samples: between the two levels scripting time moves 0.60×–0.83× while renderer thread time moves 9.8×–11.5×. So the ratio being near or below 1 was never physically impossible – it was a counter answering a question I wasn't asking. **The ordering within each throttle section is measured identically for all five and is comparable. The magnitudes between sections are not, and no amount of re-running will make them so.**
 
 ### Interaction latency, frame pacing, blocking time
 
@@ -230,7 +236,7 @@ The limitations, at the same level of detail as the results. This section exists
 
 **The row-render metric saturates at the top rate.** Restated because it matters: at 1000 updates/sec that column cannot distinguish an optimal implementation from a fully broken one. It is published with its ceiling next to it rather than quietly dropped, because the previous version of this README leaned on that exact cell as its strongest evidence.
 
-**The React component boundary is fixed, and that constrains every implementation equally but not identically.** The shared tables take a parent-owned array of row models and memoise the rows inside. So what is compared is five state layers feeding one component topology — not the best subscription topology each library could reach. A row leaf that subscribes to its own store slice by id, which is idiomatic for a high-frequency table in every one of these five, is not expressible against this UI. The constraint plausibly costs MobX and Jotai most, since per-row subscription is exactly their pitch and they are forced to funnel it through an array the parent owns. Exporting row-level primitives instead would have advantaged whichever libraries could exploit them, so the boundary is held fixed and declared here rather than tuned.
+**The React component boundary is fixed, and that constrains every implementation equally but not identically.** The shared tables take a parent-owned array of row models and memoise the rows inside. So what is compared is five state layers feeding one component topology – not the best subscription topology each library could reach. A row leaf that subscribes to its own store slice by id, which is idiomatic for a high-frequency table in every one of these five, is not expressible against this UI. The constraint plausibly costs MobX and Jotai most, since per-row subscription is exactly their pitch and they are forced to funnel it through an array the parent owns. Exporting row-level primitives instead would have advantaged whichever libraries could exploit them, so the boundary is held fixed and declared here rather than tuned.
 
 **The journal screen is never benchmarked.** The feed lives in the terminal, so the aggregate-heavy half of the app – where `reselect`, MobX computeds and the atom graph would most plausibly diverge – contributes to the parity suites and to no performance number at all.
 
