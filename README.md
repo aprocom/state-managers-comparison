@@ -174,11 +174,11 @@ Regenerate with `npm run metrics`.
 
 | | Bundle (gzip) | State-layer SLOC | Files | Wiring SLOC outside the state layer |
 |---|---:|---:|---:|---:|
-| **Jotai** | 69.2 kB | 197 | 2 | 131 |
-| **MobX** | 83.2 kB | 270 | 1 | 106 |
-| **Zustand** | 65.9 kB | 302 | 3 | 124 |
-| **Redux Toolkit** | 78.2 kB | 316 | 3 | 147 |
-| **RxJS** | 72.6 kB | 350 | 2 | 118 |
+| **Jotai** | 69.2 kB | 183 | 3 | 126 |
+| **MobX** | 83.2 kB | 260 | 2 | 101 |
+| **Zustand** | 66.0 kB | 298 | 4 | 119 |
+| **Redux Toolkit** | 78.2 kB | 306 | 4 | 142 |
+| **RxJS** | 72.6 kB | 336 | 3 | 113 |
 
 SLOC is non-blank, non-comment lines, so an implementation is not penalised for explaining itself. Bundle size is gzip -9 of the emitted JS and includes React and the shared packages in every figure – only the *deltas* between rows are library cost. The wiring column is counted separately on purpose: excluding it entirely flatters whichever library pushes work into the screens, and folding it in flatters whichever pushes it into the store.
 
@@ -229,6 +229,8 @@ The limitations, at the same level of detail as the results. This section exists
 **Chromium only.** No Firefox, no Safari, no real mobile device – 4× CPU throttling is a model of a mid-range phone, not a phone.
 
 **The row-render metric saturates at the top rate.** Restated because it matters: at 1000 updates/sec that column cannot distinguish an optimal implementation from a fully broken one. It is published with its ceiling next to it rather than quietly dropped, because the previous version of this README leaned on that exact cell as its strongest evidence.
+
+**The React component boundary is fixed, and that constrains every implementation equally but not identically.** The shared tables take a parent-owned array of row models and memoise the rows inside. So what is compared is five state layers feeding one component topology — not the best subscription topology each library could reach. A row leaf that subscribes to its own store slice by id, which is idiomatic for a high-frequency table in every one of these five, is not expressible against this UI. The constraint plausibly costs MobX and Jotai most, since per-row subscription is exactly their pitch and they are forced to funnel it through an array the parent owns. Exporting row-level primitives instead would have advantaged whichever libraries could exploit them, so the boundary is held fixed and declared here rather than tuned.
 
 **The journal screen is never benchmarked.** The feed lives in the terminal, so the aggregate-heavy half of the app – where `reselect`, MobX computeds and the atom graph would most plausibly diverge – contributes to the parity suites and to no performance number at all.
 
@@ -343,7 +345,7 @@ npm run metrics
 
 The parity suites are the acceptance gate: every implementation must pass the same functional tests and produce an identical derived-state vector before its performance is measured at all.
 
-Current counts: **184 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
+Current counts: **189 unit tests**, **51 e2e tests**, `tsc --strict` with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` clean across nine projects.
 
 ## Licence
 
