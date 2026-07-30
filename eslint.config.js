@@ -43,6 +43,12 @@ export default tseslint.config(
     },
   },
   {
+    // Its page.evaluate() callback is serialised into Chromium and runs there,
+    // so `document` is defined at the point it is used and nowhere else.
+    files: ['scripts/check-preview.mjs'],
+    languageOptions: { globals: { document: 'readonly' } },
+  },
+  {
     files: ['**/*.tsx'],
     plugins: { 'react-hooks': reactHooks },
     rules: reactHooks.configs.recommended.rules,
