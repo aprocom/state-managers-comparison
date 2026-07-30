@@ -1,18 +1,13 @@
 import { createSelector } from 'reselect';
 import {
-  INSTRUMENTS, avgHoldingMs, equityCurve, evaluateAlerts, maxDrawdown, profitFactor,
-  rMultiple, realizedPnl, unrealizedPnl, winRate,
+  DAILY_LOSS_LIMIT, INSTRUMENTS, RISK_LIMIT_PER_TRADE, avgHoldingMs, equityCurve,
+  evaluateAlerts, maxDrawdown, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
 } from '@smc/domain';
 import type { Alert, AlertContext, EquityPoint, InstrumentId, Trade } from '@smc/domain';
 import type { InstrumentRowModel, JournalRowModel, PositionRowModel } from '@smc/ui';
 import type { RootState } from './slice';
 import { positionsAdapter, tradesAdapter } from './slice';
-
-export const DAILY_LOSS_LIMIT = 400;
-export const RISK_LIMIT_PER_TRADE = 100;
-
-const LABELS = new Map(INSTRUMENTS.map((i) => [i.id, `${i.base}/${i.quote}`]));
-const PRECISIONS = new Map(INSTRUMENTS.map((i) => [i.id, i.pricePrecision]));
+import { instrumentLabel, instrumentPrecision } from './utils';
 
 const selectPrices = (state: RootState) => state.app.prices;
 const selectDirections = (state: RootState) => state.app.priceDirections;
@@ -53,9 +48,9 @@ export const selectInstrumentRows = createSelector(
       }
       const row: InstrumentRowModel = {
         id: instrument.id,
-        label: LABELS.get(instrument.id) ?? instrument.id,
+        label: instrumentLabel(instrument.id),
         price,
-        precision: PRECISIONS.get(instrument.id) ?? 2,
+        precision: instrumentPrecision(instrument.id),
         changeDirection,
         pinned: isPinned,
       };

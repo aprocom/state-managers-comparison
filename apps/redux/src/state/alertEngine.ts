@@ -1,10 +1,7 @@
 import type { Alert } from '@smc/domain';
 import type { AppStore, RootState } from './slice';
 import { selectAlerts, selectHeldInstrumentIds } from './selectors';
-
-function alertKey(alert: Alert): string {
-  return `${alert.kind}:${alert.subjectId}`;
-}
+import { alertKey } from '@smc/domain';
 
 /**
  * RTK's listener middleware, which is the sanctioned place for this kind of

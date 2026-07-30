@@ -40,6 +40,16 @@ export interface AlertContext {
  * and how to fire each alert exactly once per transition is the state layer's
  * job, and is precisely what the comparison measures.
  */
+/**
+ * The identity of an alert across time: the same rule firing about the same
+ * subject is the same alert. Every implementation needs this to fire once per
+ * transition rather than once per evaluation, so it is a domain fact, not a
+ * storage detail — it lived in all five state layers until it was not.
+ */
+export function alertKey(alert: Alert): string {
+  return `${alert.kind}:${alert.subjectId}`;
+}
+
 export function evaluateAlerts(context: AlertContext): Alert[] {
   const alerts: Alert[] = [];
 

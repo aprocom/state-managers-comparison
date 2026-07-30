@@ -1,10 +1,32 @@
 import { INSTRUMENTS, START_PRICES } from './instruments';
 import { mulberry32 } from './random';
-import type { Side, Trade } from './types';
+import type { Position, Side, Trade } from './types';
 
 export const STRATEGIES = ['breakout', 'mean-reversion', 'trend', 'scalp', 'news'];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The six open positions every implementation starts from. It lives here, next
+ * to `createTradeHistory`, because it is the same kind of thing: seeded fixture
+ * data with no library involvement whatsoever. Keeping a copy inside each app's
+ * state layer made five byte-identical functions and charged every library for
+ * the lines.
+ */
+export function seedPositions(seed: number, now: number): Position[] {
+  const nextRandom = mulberry32(seed);
+  return INSTRUMENTS.slice(0, 6).map((instrument, index) => ({
+    id: `pos-${index}`,
+    instrumentId: instrument.id,
+    side: nextRandom() < 0.6 ? 'long' : 'short',
+    size: Number(((200 + nextRandom() * 800) / (START_PRICES[instrument.id] ?? 100)).toFixed(6)),
+    entryPrice: START_PRICES[instrument.id] ?? 100,
+    // One position is deliberately long-held so the time-in-trade alert has a subject.
+    openedAt: now - (index === 0 ? 40 * 60 * 60 * 1000 : Math.floor(nextRandom() * 3 * 60 * 60 * 1000)),
+    // One position deliberately breaches the per-trade risk limit.
+    riskAmount: index === 1 ? 150 : Number((20 + nextRandom() * 60).toFixed(2)),
+  }));
+}
 
 /**
  * Deterministic closed-trade history ending at `endTs`, spread over the

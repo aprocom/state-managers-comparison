@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STRATEGIES, createTradeHistory } from './fixtures';
+import { STRATEGIES, createTradeHistory, seedPositions } from './fixtures';
 import { INSTRUMENTS } from './instruments';
 
 const END = 1_800_000_000_000;
@@ -47,5 +47,41 @@ describe('createTradeHistory', () => {
     const trades = createTradeHistory(1, 250, END);
     expect(trades.some((t) => t.exitPrice > t.entryPrice)).toBe(true);
     expect(trades.some((t) => t.exitPrice < t.entryPrice)).toBe(true);
+  });
+});
+
+describe('seedPositions', () => {
+  it('opens six positions on the first six instruments', () => {
+    const positions = seedPositions(20260729, END);
+    expect(positions).toHaveLength(6);
+    expect(positions.map((p) => p.instrumentId))
+      .toEqual(INSTRUMENTS.slice(0, 6).map((i) => i.id));
+  });
+
+  it('replays identically for the same seed and diverges for another', () => {
+    expect(seedPositions(7, END)).toEqual(seedPositions(7, END));
+    expect(seedPositions(7, END)).not.toEqual(seedPositions(8, END));
+  });
+
+  /**
+   * These two are not incidental. The fixture exists to give the alert rules
+   * something to fire on: without a long-held position the time-in-trade rule
+   * has no subject, and without a breach the per-trade risk rule never trips.
+   * All five implementations are compared on the alert set they produce.
+   */
+  it('holds one position long enough to trip the time-in-trade rule', () => {
+    const positions = seedPositions(20260729, END);
+    expect(positions.some((p) => END - p.openedAt >= 40 * 60 * 60 * 1000)).toBe(true);
+  });
+
+  it('breaches the per-trade risk limit exactly once', () => {
+    const positions = seedPositions(20260729, END);
+    expect(positions.filter((p) => p.riskAmount > 100)).toHaveLength(1);
+  });
+
+  it('is anchored to the clock it is given', () => {
+    const [first] = seedPositions(3, END);
+    const [shifted] = seedPositions(3, END + 1000);
+    expect(shifted!.openedAt - first!.openedAt).toBe(1000);
   });
 });

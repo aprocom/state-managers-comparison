@@ -59,3 +59,14 @@ export function nextDirection(previous: number, next: number): PriceDirection {
   if (next === previous) return 'flat';
   return next > previous ? 'up' : 'down';
 }
+
+/**
+ * The journal's filter. It is application state — all five implementations
+ * store it — so it belongs here rather than in the presentational package that
+ * happens to render the control for it.
+ */
+export interface JournalFilter {
+  strategy: string | null;
+  side: Side | null;
+  instrumentId: InstrumentId | null;
+}

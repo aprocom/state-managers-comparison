@@ -1,11 +1,5 @@
-import type { InstrumentId, Side } from '@smc/domain';
+import type { InstrumentId, JournalFilter, Side } from '@smc/domain';
 import { TESTID } from './testids';
-
-export interface JournalFilter {
-  strategy: string | null;
-  side: Side | null;
-  instrumentId: InstrumentId | null;
-}
 
 export function FilterBar(props: {
   filter: JournalFilter;

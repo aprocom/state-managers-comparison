@@ -1,21 +1,20 @@
 import { computed, makeObservable, observable, action, reaction } from 'mobx';
 import {
   nextDirection,
-  INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
-  maxDrawdown, mulberry32, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
+  DAILY_LOSS_LIMIT, INSTRUMENTS, NOW, RISK_LIMIT_PER_TRADE, SEED, START_PRICES, TRADE_COUNT,
+  avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts, maxDrawdown, profitFactor,
+  rMultiple, realizedPnl, seedPositions, unrealizedPnl, winRate,
 } from '@smc/domain';
 import type {
-  Alert, AlertContext, EquityPoint, Instrument, InstrumentId, Position, Quote, Trade,
+  Alert, AlertContext, EquityPoint, Instrument, InstrumentId, JournalFilter,
+  Position, Quote, Trade,
 } from '@smc/domain';
-import type {
-  InstrumentRowModel, JournalFilter, JournalRowModel, PositionRowModel,
-} from '@smc/ui';
+import type { InstrumentRowModel, JournalRowModel, PositionRowModel } from '@smc/ui';
+import { alertKey } from '@smc/domain';
+import { alertKeys } from './utils';
 
 export type PriceDirection = 'up' | 'down' | 'flat';
 export type Screen = 'terminal' | 'journal';
-
-export const DAILY_LOSS_LIMIT = 400;
-export const RISK_LIMIT_PER_TRADE = 100;
 
 /**
  * One observable per instrument, each with its own computed row. MobX caches a
@@ -107,19 +106,6 @@ export interface StoreOptions {
   seed: number;
   tradeCount: number;
   now: number;
-}
-
-function seedPositions(seed: number, now: number): Position[] {
-  const nextRandom = mulberry32(seed);
-  return INSTRUMENTS.slice(0, 6).map((instrument, index) => ({
-    id: `pos-${index}`,
-    instrumentId: instrument.id,
-    side: nextRandom() < 0.6 ? 'long' : 'short',
-    size: Number(((200 + nextRandom() * 800) / (START_PRICES[instrument.id] ?? 100)).toFixed(6)),
-    entryPrice: START_PRICES[instrument.id] ?? 100,
-    openedAt: now - (index === 0 ? 40 * 60 * 60 * 1000 : Math.floor(nextRandom() * 3 * 60 * 60 * 1000)),
-    riskAmount: index === 1 ? 150 : Number((20 + nextRandom() * 60).toFixed(2)),
-  }));
 }
 
 export class AppStore {
@@ -321,10 +307,6 @@ export class AppStore {
   }
 }
 
-export function alertKeys(alerts: Alert[]): string {
-  return alerts.map((alert) => `${alert.kind}:${alert.subjectId}`).sort().join('|');
-}
-
 export function attachAlertEngine(
   store: AppStore,
   onFire: (alert: Alert) => void,
@@ -334,9 +316,9 @@ export function attachAlertEngine(
     () => alertKeys(store.alerts),
     () => {
       const alerts = store.alerts;
-      const keys = new Set(alerts.map((alert) => `${alert.kind}:${alert.subjectId}`));
+      const keys = new Set(alerts.map(alertKey));
       for (const alert of alerts) {
-        if (!firedKeys.has(`${alert.kind}:${alert.subjectId}`)) onFire(alert);
+        if (!firedKeys.has(alertKey(alert))) onFire(alert);
       }
       firedKeys = keys;
     },
@@ -345,7 +327,7 @@ export function attachAlertEngine(
 }
 
 export const appStore = new AppStore({
-  seed: 20260729,
-  tradeCount: 250,
-  now: Date.UTC(2026, 6, 29),
+  seed: SEED,
+  tradeCount: TRADE_COUNT,
+  now: NOW,
 });

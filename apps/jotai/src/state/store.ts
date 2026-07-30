@@ -1,6 +1,7 @@
 import { createStore } from 'jotai';
 import type { Alert } from '@smc/domain';
-import { alertKey, alertsAtom } from './atoms';
+import { alertsAtom } from './atoms';
+import { alertKey } from '@smc/domain';
 
 export type AppStore = ReturnType<typeof createStore>;
 

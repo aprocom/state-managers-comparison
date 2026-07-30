@@ -4,27 +4,18 @@ import { atom } from 'jotai';
 import { atomFamily } from 'jotai-family';
 import {
   nextDirection,
-  INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
-  maxDrawdown, mulberry32, profitFactor, rMultiple, realizedPnl, unrealizedPnl, winRate,
+  DAILY_LOSS_LIMIT, INSTRUMENTS, NOW, RISK_LIMIT_PER_TRADE, SEED, START_PRICES, TRADE_COUNT,
+  avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts, maxDrawdown, profitFactor,
+  rMultiple, realizedPnl, seedPositions, unrealizedPnl, winRate,
 } from '@smc/domain';
 import type {
-  Alert, AlertContext, EquityPoint, InstrumentId, Position, Quote, Trade,
+  Alert, AlertContext, EquityPoint, InstrumentId, JournalFilter, Position, Quote, Trade,
 } from '@smc/domain';
-import type {
-  InstrumentRowModel, JournalFilter, JournalRowModel, PositionRowModel,
-} from '@smc/ui';
+import type { InstrumentRowModel, JournalRowModel, PositionRowModel } from '@smc/ui';
+import { instrumentById } from './utils';
 
 export type PriceDirection = 'up' | 'down' | 'flat';
 export type Screen = 'terminal' | 'journal';
-
-export const DAILY_LOSS_LIMIT = 400;
-export const RISK_LIMIT_PER_TRADE = 100;
-
-export const SEED = 20260729;
-export const TRADE_COUNT = 250;
-export const NOW = Date.UTC(2026, 6, 29);
-
-const INSTRUMENT_BY_ID = new Map(INSTRUMENTS.map((instrument) => [instrument.id, instrument]));
 
 interface PriceCell {
   price: number;
@@ -60,7 +51,7 @@ export const pinnedAtomFamily = atomFamily((_id: InstrumentId) => atom(false));
 /** Derived per instrument, so an untouched instrument keeps its row identity. */
 export const instrumentRowAtomFamily = atomFamily((id: InstrumentId) => atom((get): InstrumentRowModel => {
   const cell = get(priceAtomFamily(id));
-  const instrument = INSTRUMENT_BY_ID.get(id);
+  const instrument = instrumentById(id);
   return {
     id,
     label: instrument === undefined ? id : `${instrument.base}/${instrument.quote}`,
@@ -103,19 +94,6 @@ export const applyQuoteAtom = atom(null, (get, set, quote: Quote) => {
 });
 
 // --- Base state -------------------------------------------------------------
-
-function seedPositions(seed: number, now: number): Position[] {
-  const nextRandom = mulberry32(seed);
-  return INSTRUMENTS.slice(0, 6).map((instrument, index) => ({
-    id: `pos-${index}`,
-    instrumentId: instrument.id,
-    side: nextRandom() < 0.6 ? 'long' : 'short',
-    size: Number(((200 + nextRandom() * 800) / (START_PRICES[instrument.id] ?? 100)).toFixed(6)),
-    entryPrice: START_PRICES[instrument.id] ?? 100,
-    openedAt: now - (index === 0 ? 40 * 60 * 60 * 1000 : Math.floor(nextRandom() * 3 * 60 * 60 * 1000)),
-    riskAmount: index === 1 ? 150 : Number((20 + nextRandom() * 60).toFixed(2)),
-  }));
-}
 
 export const positionsAtom = atom<Position[]>(seedPositions(SEED, NOW));
 export const tradesAtom = atom<Trade[]>(createTradeHistory(SEED, TRADE_COUNT, NOW));
@@ -246,7 +224,3 @@ export const alertContextAtom = atom((get): AlertContext => {
 });
 
 export const alertsAtom = atom((get): Alert[] => evaluateAlerts(get(alertContextAtom)));
-
-export function alertKey(alert: Alert): string {
-  return `${alert.kind}:${alert.subjectId}`;
-}

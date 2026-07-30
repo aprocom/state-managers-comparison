@@ -3,23 +3,14 @@ import {
 } from '@reduxjs/toolkit';
 import type { EntityState, PayloadAction } from '@reduxjs/toolkit';
 import {
-  INSTRUMENTS, START_PRICES, createTradeHistory, mulberry32, nextDirection,
+  INSTRUMENTS, NOW, SEED, START_PRICES, TRADE_COUNT,
+  createTradeHistory, nextDirection, seedPositions,
 } from '@smc/domain';
-import type { InstrumentId, Position, Quote, Trade } from '@smc/domain';
-import type { JournalFilter } from '@smc/ui';
+import type { InstrumentId, JournalFilter, Position, Quote, Trade } from '@smc/domain';
+
 
 export type PriceDirection = 'up' | 'down' | 'flat';
 export type Screen = 'terminal' | 'journal';
-
-export const SEED = 20260729;
-export const TRADE_COUNT = 250;
-
-/**
- * Frozen at construction. The alert rules read the clock, and evaluating them
- * against a live Date.now() while seeding positions from a fixed date made the
- * alert set drift with the calendar. All five implementations freeze it alike.
- */
-export const NOW = Date.UTC(2026, 6, 29);
 
 /**
  * Normalised, because this is what Redux is actually for. Editing a trade used
@@ -43,19 +34,6 @@ export interface AppState {
   feedRate: number;
   screen: Screen;
   filter: JournalFilter;
-}
-
-function seedPositions(seed: number, now: number): Position[] {
-  const nextRandom = mulberry32(seed);
-  return INSTRUMENTS.slice(0, 6).map((instrument, index) => ({
-    id: `pos-${index}`,
-    instrumentId: instrument.id,
-    side: nextRandom() < 0.6 ? 'long' : 'short',
-    size: Number(((200 + nextRandom() * 800) / (START_PRICES[instrument.id] ?? 100)).toFixed(6)),
-    entryPrice: START_PRICES[instrument.id] ?? 100,
-    openedAt: now - (index === 0 ? 40 * 60 * 60 * 1000 : Math.floor(nextRandom() * 3 * 60 * 60 * 1000)),
-    riskAmount: index === 1 ? 150 : Number((20 + nextRandom() * 60).toFixed(2)),
-  }));
 }
 
 export function createInitialState(

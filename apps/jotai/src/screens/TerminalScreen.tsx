@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { INSTRUMENTS, START_PRICES, createFeed } from '@smc/domain';
+import { createAppFeed } from '@smc/domain';
 import type { Feed } from '@smc/domain';
 import { INITIAL_FEED_RATE, AccountSummary, AlertList, InstrumentTable, PositionsPanel, TESTID } from '@smc/ui';
 import {
@@ -38,12 +38,7 @@ export function TerminalScreen() {
   // last sequence it had seen, so the store's staleness guard silently dropped
   // the next N quotes per instrument.
   useEffect(() => {
-    const feed = createFeed({
-      instruments: INSTRUMENTS,
-      seed: 20260729,
-      updatesPerSecond: INITIAL_FEED_RATE,
-      startPrices: START_PRICES,
-    });
+    const feed = createAppFeed(INITIAL_FEED_RATE);
     feedRef.current = feed;
     const unsubscribe = feed.subscribe(applyQuote);
     feed.start();

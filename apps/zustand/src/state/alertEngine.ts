@@ -1,14 +1,10 @@
-import { avgHoldingMs, evaluateAlerts, unrealizedPnl } from '@smc/domain';
+import {
+  DAILY_LOSS_LIMIT, RISK_LIMIT_PER_TRADE, alertKey, avgHoldingMs, evaluateAlerts, unrealizedPnl,
+} from '@smc/domain';
 import type { Alert, AlertContext } from '@smc/domain';
 import type { AppState, createAppStore } from './store';
-import { memoizeOne, selectHeldPrices } from './selectors';
-
-export const DAILY_LOSS_LIMIT = 400;
-export const RISK_LIMIT_PER_TRADE = 100;
-
-function alertKey(alert: Alert): string {
-  return `${alert.kind}:${alert.subjectId}`;
-}
+import { selectHeldPrices } from './selectors';
+import { memoizeOne } from './utils';
 
 /**
  * Sorting 250 trades on every alert evaluation was work Redux did not do — its

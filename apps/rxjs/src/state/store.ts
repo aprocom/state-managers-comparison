@@ -4,63 +4,23 @@ import {
 } from 'rxjs';
 import type { Observable } from 'rxjs';
 import {
-  INSTRUMENTS, START_PRICES, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts,
-  maxDrawdown, mulberry32, nextDirection, profitFactor, rMultiple, realizedPnl, unrealizedPnl,
-  winRate,
+  DAILY_LOSS_LIMIT, INSTRUMENTS, NOW, RISK_LIMIT_PER_TRADE, SEED, START_PRICES, TRADE_COUNT,
+  alertKey, avgHoldingMs, createTradeHistory, equityCurve, evaluateAlerts, maxDrawdown,
+  nextDirection, profitFactor, rMultiple, realizedPnl, seedPositions, unrealizedPnl, winRate,
 } from '@smc/domain';
 import type {
-  Alert, AlertContext, EquityPoint, InstrumentId, Position, Quote, Trade,
+  Alert, AlertContext, EquityPoint, InstrumentId, JournalFilter, Position, Quote, Trade,
 } from '@smc/domain';
-import type {
-  InstrumentRowModel, JournalFilter, JournalRowModel, PositionRowModel,
-} from '@smc/ui';
+import type { InstrumentRowModel, JournalRowModel, PositionRowModel } from '@smc/ui';
+import { INDEX_BY_ID, initialInstrumentRows, orderPinnedFirst } from './utils';
 
 export type PriceDirection = 'up' | 'down' | 'flat';
 export type Screen = 'terminal' | 'journal';
-
-export const DAILY_LOSS_LIMIT = 400;
-export const RISK_LIMIT_PER_TRADE = 100;
-
-const INDEX_BY_ID = new Map(INSTRUMENTS.map((instrument, index) => [instrument.id, index]));
-
-export function alertKey(alert: Alert): string {
-  return `${alert.kind}:${alert.subjectId}`;
-}
 
 export interface StoreOptions {
   seed: number;
   tradeCount: number;
   now: number;
-}
-
-function seedPositions(seed: number, now: number): Position[] {
-  const nextRandom = mulberry32(seed);
-  return INSTRUMENTS.slice(0, 6).map((instrument, index) => ({
-    id: `pos-${index}`,
-    instrumentId: instrument.id,
-    side: nextRandom() < 0.6 ? 'long' : 'short',
-    size: Number(((200 + nextRandom() * 800) / (START_PRICES[instrument.id] ?? 100)).toFixed(6)),
-    entryPrice: START_PRICES[instrument.id] ?? 100,
-    openedAt: now - (index === 0 ? 40 * 60 * 60 * 1000 : Math.floor(nextRandom() * 3 * 60 * 60 * 1000)),
-    riskAmount: index === 1 ? 150 : Number((20 + nextRandom() * 60).toFixed(2)),
-  }));
-}
-
-function initialInstrumentRows(): InstrumentRowModel[] {
-  return INSTRUMENTS.map((instrument) => ({
-    id: instrument.id,
-    label: `${instrument.base}/${instrument.quote}`,
-    price: START_PRICES[instrument.id] ?? 0,
-    precision: instrument.pricePrecision,
-    changeDirection: 'flat',
-    pinned: false,
-  }));
-}
-
-/** Stable partition: pinned rows first, each group keeping its original order. */
-function orderPinnedFirst(rows: InstrumentRowModel[]): InstrumentRowModel[] {
-  const pinned = rows.filter((row) => row.pinned);
-  return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
 }
 
 interface PriceState {
@@ -419,7 +379,7 @@ export function createAppStore(options: StoreOptions): AppStore {
 }
 
 export const appStore = createAppStore({
-  seed: 20260729,
-  tradeCount: 250,
-  now: Date.UTC(2026, 6, 29),
+  seed: SEED,
+  tradeCount: TRADE_COUNT,
+  now: NOW,
 });

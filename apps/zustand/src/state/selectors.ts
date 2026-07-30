@@ -5,55 +5,23 @@ import {
 import type { EquityPoint, InstrumentId, Trade } from '@smc/domain';
 import type { InstrumentRowModel, JournalRowModel, PositionRowModel } from '@smc/ui';
 import type { AppState } from './store';
-
-const LABELS = new Map(INSTRUMENTS.map((i) => [i.id, `${i.base}/${i.quote}`]));
-const PRECISIONS = new Map(INSTRUMENTS.map((i) => [i.id, i.pricePrecision]));
-
-/**
- * What Zustand does and does not give you, stated precisely — an earlier
- * version of this file hand-rolled a memoiser and then billed Zustand for the
- * lines, which measured the author rather than the library.
- *
- * Zustand ships `useShallow` (zustand/react/shallow). It solves reference
- * stability at the subscription: the selector re-runs on every store change,
- * but the component only re-renders when the shallow contents differ. Every
- * call site below uses it, so no selector needs a wrapper to stay stable.
- *
- * What Zustand genuinely does not ship is a derivation cache. `useShallow`
- * compares *after* computing, so an expensive derivation still runs on every
- * store change. Two things follow, and they are the real cost of the
- * minimalism: per-row identity caches (below) so `React.memo` can skip
- * untouched rows, and one explicit memo on the trade filter. MobX computeds
- * and Jotai derived atoms get both from their dependency graph.
- */
-export function memoizeOne<A extends readonly unknown[], R>(
-  compute: (...args: A) => R,
-): (...args: A) => R {
-  let lastArgs: A | null = null;
-  let lastResult: R;
-  return (...args: A): R => {
-    if (
-      lastArgs !== null
-      && lastArgs.length === args.length
-      && lastArgs.every((value, index) => Object.is(value, args[index]))
-    ) {
-      return lastResult;
-    }
-    lastArgs = args;
-    lastResult = compute(...args);
-    return lastResult;
-  };
-}
+import {
+  instrumentLabel, instrumentPrecision, memoizeOne, orderPinnedFirst,
+} from './utils';
 
 // --- Terminal ---------------------------------------------------------------
 
+/**
+ * Per-row identity cache, and the first of the two real costs of Zustand's
+ * minimalism. `useShallow` — which every call site in the screens uses, so no
+ * selector here needs a wrapper to stay stable — solves reference stability at
+ * the *subscription*: it compares after computing, so the component does not
+ * re-render, but the row objects are still new and `React.memo` on a row needs
+ * them not to be. The second cost is the explicit memo on the trade filter
+ * below. MobX computeds and Jotai derived atoms get both from their dependency
+ * graph; here they are hand-written, and the comparison counts them.
+ */
 const instrumentRowCache = new Map<InstrumentId, InstrumentRowModel>();
-
-/** Stable partition: pinned rows first, each group keeping its original order. */
-export function orderPinnedFirst(rows: InstrumentRowModel[]): InstrumentRowModel[] {
-  const pinned = rows.filter((row) => row.pinned);
-  return pinned.length === 0 ? rows : [...pinned, ...rows.filter((row) => !row.pinned)];
-}
 
 export function selectInstrumentRows(state: AppState): InstrumentRowModel[] {
   const pinned = new Set(state.pinned);
@@ -72,9 +40,9 @@ export function selectInstrumentRows(state: AppState): InstrumentRowModel[] {
     }
     const row: InstrumentRowModel = {
       id: instrument.id,
-      label: LABELS.get(instrument.id) ?? instrument.id,
+      label: instrumentLabel(instrument.id),
       price,
-      precision: PRECISIONS.get(instrument.id) ?? 2,
+      precision: instrumentPrecision(instrument.id),
       changeDirection,
       pinned: isPinned,
     };
