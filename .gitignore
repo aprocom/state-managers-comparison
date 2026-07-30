@@ -6,6 +6,7 @@ coverage/
 .env
 .env.*
 !.env.example
+site/
 playwright-report/
 test-results/
 # Benchmark output is committed — the published numbers must be reproducible.

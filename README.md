@@ -300,7 +300,7 @@ What is new here is the combination: same app N ways, *and* real measurement, *a
 - [x] **The throttling anomaly, explained rather than declared** – the harness loop order was one cause; the other is that `ScriptDuration` cannot see the CPU that throttling charges, demonstrated by `npm run probe:throttle` and recorded per sample as `threadMsPerSecond`
 - [ ] **Concurrency safety** – run dai-shi's tearing suite against all five
 - [ ] **End-to-end coverage for an alert leaving the panel** – needs a deterministic way to drive the store from the browser
-- [ ] **Live demo** on GitHub Pages with an implementation switcher
+- [x] **Live demo** on GitHub Pages with an implementation switcher — [all five, running](https://aprocom.github.io/state-managers-comparison/), gated on the same parity suites as the benchmark
 
 ---
 
@@ -318,6 +318,8 @@ Effector is prominent in Russian-language discussion and largely absent from Eng
 ---
 
 ## Running it
+
+**Live demos: [aprocom.github.io/state-managers-comparison](https://aprocom.github.io/state-managers-comparison/)** — the same five builds, with a switcher between them. Watching them proves nothing about performance, which is the point: nothing you can see distinguishes these five, and the harness agrees on every metric except main-thread CPU.
 
 Requires Node 22+.
 

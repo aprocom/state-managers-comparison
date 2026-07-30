@@ -2,7 +2,7 @@
   "name": "state-managers-comparison",
   "private": true,
   "version": "0.1.0",
-  "description": "Five React state managers, one non-trivial application, measured properly — including the parts where the measurement says nothing.",
+  "description": "Five React state managers, one non-trivial application, measured properly \u2014 including the parts where the measurement says nothing.",
   "license": "MIT",
   "author": "Alexey Yakovlev",
   "repository": {
@@ -36,6 +36,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p packages/domain && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/bench && tsc --noEmit -p apps/zustand && tsc --noEmit -p apps/rxjs && tsc --noEmit -p apps/mobx && tsc --noEmit -p apps/jotai && tsc --noEmit -p apps/redux && tsc --noEmit -p e2e",
     "build:apps": "npm run build --workspaces --if-present",
+    "build:site": "npm run build:apps && vite-node scripts/build-site.ts",
     "test:e2e": "npm run build:apps && playwright test e2e/parity.spec.ts e2e/cross-app-parity.spec.ts",
     "bench": "npm run test:e2e && playwright test e2e/benchmark.spec.ts",
     "bench:ungated": "npm run build:apps && playwright test e2e/benchmark.spec.ts",

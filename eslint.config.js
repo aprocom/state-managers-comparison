@@ -15,6 +15,8 @@ export default tseslint.config(
   {
     ignores: [
       '**/dist/**', '**/node_modules/**', 'bench-results/**', 'playwright-report/**',
+      // The assembled Pages site is copied build output, not source.
+      'site/**',
       // The config cannot type-check itself: @eslint/js ships no types.
       'eslint.config.js',
     ],
